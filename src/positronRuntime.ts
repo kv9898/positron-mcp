@@ -6,6 +6,7 @@ import type {
 } from '@posit-dev/positron';
 import {
   type ExecutionResult,
+  type ExecutionMode,
   NoActiveRuntimeError,
   type RuntimeAdapter,
   type SessionInfo,
@@ -103,7 +104,11 @@ export class PositronRuntimeAdapter implements RuntimeAdapter {
     };
   }
 
-  async execute(code: string, timeoutMs = this.options.timeoutMs): Promise<ExecutionResult> {
+  async execute(
+    code: string,
+    timeoutMs = this.options.timeoutMs,
+    mode: ExecutionMode = 'transient',
+  ): Promise<ExecutionResult> {
     if (!code.trim()) {
       throw namedError('INVALID_ARGUMENT', 'Code must not be empty.');
     }
@@ -154,7 +159,7 @@ export class PositronRuntimeAdapter implements RuntimeAdapter {
         code,
         false,
         false,
-        this.api.RuntimeCodeExecutionMode.Transient,
+        executionMode(this.api, mode),
         this.api.RuntimeErrorBehavior.Stop,
         {
           token: cancellation.token,
@@ -185,7 +190,7 @@ export class PositronRuntimeAdapter implements RuntimeAdapter {
           status: 'unsupported_result',
           session_id: session.metadata.sessionId,
           language: session.runtimeMetadata.languageId,
-          mode: 'transient',
+          mode,
           started,
           stdout,
           stderr,
@@ -204,7 +209,7 @@ export class PositronRuntimeAdapter implements RuntimeAdapter {
         status: 'success',
         session_id: session.metadata.sessionId,
         language: session.runtimeMetadata.languageId,
-        mode: 'transient',
+        mode,
         started,
         stdout,
         stderr,
@@ -221,7 +226,7 @@ export class PositronRuntimeAdapter implements RuntimeAdapter {
         status: timedOut ? 'timed_out' : interrupted ? 'interrupted' : 'error',
         session_id: session.metadata.sessionId,
         language: session.runtimeMetadata.languageId,
-        mode: 'transient',
+        mode,
         started,
         stdout,
         stderr,
@@ -266,6 +271,14 @@ export class PositronRuntimeAdapter implements RuntimeAdapter {
       size: variable.size,
       has_children: variable.has_children,
     };
+  }
+}
+
+function executionMode(api: PositronApi, mode: ExecutionMode) {
+  switch (mode) {
+    case 'non-interactive': return api.RuntimeCodeExecutionMode.NonInteractive;
+    case 'silent': return api.RuntimeCodeExecutionMode.Silent;
+    case 'transient': return api.RuntimeCodeExecutionMode.Transient;
   }
 }
 

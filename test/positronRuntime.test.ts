@@ -60,6 +60,17 @@ describe('PositronRuntimeAdapter', () => {
     expect(execute.mock.calls[0]?.[4]).toBe('transient');
   });
 
+  it.each([
+    ['transient', 'transient'],
+    ['non-interactive', 'non-interactive'],
+    ['silent', 'silent'],
+  ] as const)('passes %s execution mode to Positron', async (mode, apiMode) => {
+    const execute = vi.fn(async () => ({ 'text/plain': 'result' }));
+    const result = await adapter(createMockApi({ execute })).execute('a + b', 1000, mode);
+    expect(execute.mock.calls[0]?.[4]).toBe(apiMode);
+    expect(result.mode).toBe(mode);
+  });
+
   it('returns runtime execution errors without swallowing them', async () => {
     const runtimeError = Object.assign(new Error('object not found'), { name: 'RuntimeError' });
     const result = await adapter(createMockApi({ execute: async () => { throw runtimeError; } }))

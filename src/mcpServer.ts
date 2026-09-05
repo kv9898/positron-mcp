@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { executeTool } from './tools/execute';
 import { sessionTool } from './tools/session';
 import { variablesTool } from './tools/variables';
-import type { ExecutionResult, RuntimeAdapter } from './types';
+import type { ExecutionMode, ExecutionResult, RuntimeAdapter } from './types';
 
 const HOST = '127.0.0.1';
 const PATH = '/mcp';
@@ -19,6 +19,7 @@ const SERVER_INSTRUCTIONS = [
   'First call positron_session, then use positron_variables to discover or inspect relevant objects, and use positron_execute when evaluation or analysis is needed.',
   'For example, a request to calculate a + b should inspect a and b in Positron and evaluate the expression there.',
   'Never claim that no live interpreter exists unless positron_session returns NO_ACTIVE_RUNTIME.',
+  'Use transient execution by default. Use non-interactive only when the user wants code recorded in console history, and silent only when the user explicitly wants no console display.',
   'These tools operate on the existing foreground session and never start a new interpreter. Execution can mutate that live session, so match it to the user\'s intent.',
 ].join(' ');
 
@@ -167,7 +168,7 @@ export function createToolServer(runtime: RuntimeAdapter): McpServer {
       description: 'Evaluate R or Python code in the existing foreground Positron session. Use this for calculations and analyses involving live variables, such as a + b, summaries, transformations, or plots. It executes against the session identified before dispatch, can mutate that session, and never starts a second interpreter.',
       inputSchema: {
         code: z.string().min(1).describe('R or Python code to execute in the live foreground session.'),
-        mode: z.literal('transient').optional().default('transient').describe('Only transient execution is supported in this proof of concept.'),
+        mode: z.enum(['transient', 'non-interactive', 'silent']).optional().default('transient').describe('Execution visibility/history mode. transient (default): visible, not stored in history. non-interactive: visible and stored in history. silent: not displayed and not stored; use only when the user explicitly requests hidden execution.'),
         timeout_ms: z.number().int().min(1000).max(600000).optional().describe('Execution timeout in milliseconds.'),
       },
       annotations: {
@@ -194,7 +195,7 @@ async function toolResponse(action: () => Promise<unknown>) {
 
 async function executionToolResponse(
   runtime: RuntimeAdapter,
-  input: { code: string; mode?: 'transient'; timeout_ms?: number },
+  input: { code: string; mode?: ExecutionMode; timeout_ms?: number },
 ) {
   try {
     const value = await executeTool(runtime, input);

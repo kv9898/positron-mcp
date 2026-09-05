@@ -64,6 +64,8 @@ describe('PositronMcpHttpServer', () => {
         .toContain('instead of asking the user for values');
       expect(tools.tools.find(tool => tool.name === 'positron_execute')?.description)
         .toContain('such as a + b');
+      expect(tools.tools.find(tool => tool.name === 'positron_execute')?.inputSchema)
+        .toMatchObject({ properties: { mode: { enum: ['transient', 'non-interactive', 'silent'] } } });
       const result = await client.callTool({ name: 'positron_session', arguments: {} });
       expect(result.isError).not.toBe(true);
     } finally {

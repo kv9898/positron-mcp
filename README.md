@@ -6,7 +6,7 @@ The proof of concept provides three tools:
 
 - `positron_session` — foreground session/runtime metadata.
 - `positron_variables` — bounded variable metadata, optionally including one object's immediate children.
-- `positron_execute` — transient code execution in that exact foreground session, with stdout, stderr, result/error, timeout status, and static plot attachments where Positron emits them.
+- `positron_execute` — controlled code execution in that exact foreground session, with selectable visibility/history mode, stdout, stderr, result/error, timeout status, and static plot attachments where Positron emits them.
 
 ## Requirements
 
@@ -168,7 +168,13 @@ Without `name`, it lists root variables. With `name`, it returns that variable a
 { "code": "summary(df)", "mode": "transient", "timeout_ms": 60000 }
 ```
 
-Only `transient` mode is accepted. The code is sent to the foreground session ID with console focus disabled. Runtime failures, interruption, timeout, and non-JSON result types have distinct statuses. A non-idle runtime is rejected instead of silently queueing work. On timeout the Positron cancellation token requests interruption of the running session. Static plots are attached as MCP image content when the current API emits them and the configured output cap does not truncate them.
+Three execution modes are accepted:
+
+- `transient` (default) displays execution in the console but does not add it to history.
+- `non-interactive` displays execution and stores it in console history, without combining it with pending console input.
+- `silent` neither displays execution nor stores it in history. MCP guidance tells Codex to use this only when the user explicitly requests hidden execution.
+
+Positron's `interactive` and `unprocessed` modes are intentionally not exposed because they can combine MCP code with pending input in the user's console. The code is sent to the foreground session ID with console focus disabled. Runtime failures, interruption, timeout, and non-JSON result types have distinct statuses. A non-idle runtime is rejected instead of silently queueing work. On timeout the Positron cancellation token requests interruption of the running session. Static plots are attached as MCP image content when the current API emits them and the configured output cap does not truncate them.
 
 ## Security
 
