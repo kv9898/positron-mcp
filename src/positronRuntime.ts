@@ -109,6 +109,13 @@ export class PositronRuntimeAdapter implements RuntimeAdapter {
     }
 
     const session = await this.requireForegroundSession();
+    const runtimeState = session.getRuntimeState?.();
+    if (runtimeState && runtimeState !== 'idle') {
+      throw namedError(
+        'RUNTIME_NOT_IDLE',
+        `The foreground Positron runtime is ${runtimeState}; execution was not queued. Wait until it is idle and try again.`,
+      );
+    }
     const cancellation = this.createCancellationSource();
     const startedAt = Date.now();
     let started = false;
@@ -131,13 +138,18 @@ export class PositronRuntimeAdapter implements RuntimeAdapter {
       return current + value;
     };
 
-    const timer = setTimeout(() => {
-      timedOut = true;
-      cancellation.cancel();
-    }, clampInteger(timeoutMs, 1000, 600000));
+    const effectiveTimeoutMs = clampInteger(timeoutMs, 1000, 600000);
+    let timer: NodeJS.Timeout;
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        timedOut = true;
+        cancellation.cancel();
+        reject(namedError('ExecutionTimeoutError', `Execution exceeded ${effectiveTimeoutMs} ms.`));
+      }, effectiveTimeoutMs);
+    });
 
     try {
-      const result = await this.api.runtime.executeCode(
+      const execution = this.api.runtime.executeCode(
         session.runtimeMetadata.languageId,
         code,
         false,
@@ -163,9 +175,30 @@ export class PositronRuntimeAdapter implements RuntimeAdapter {
         { source: 'positron-codex-mcp' },
         { client: 'Codex MCP' },
       );
+      const result = await Promise.race([execution, timeout]);
 
       const limitedResult = limitJson(result, this.options.maxOutputCharacters);
       outputTruncated ||= limitedResult.truncated;
+      if (limitedResult.unsupported) {
+        return {
+          success: false,
+          status: 'unsupported_result',
+          session_id: session.metadata.sessionId,
+          language: session.runtimeMetadata.languageId,
+          mode: 'transient',
+          started,
+          stdout,
+          stderr,
+          result: {},
+          plots,
+          output_truncated: outputTruncated,
+          elapsed_ms: Date.now() - startedAt,
+          error: {
+            name: 'UnsupportedResultTypeError',
+            message: limitedResult.unsupported,
+          },
+        };
+      }
       return {
         success: true,
         status: 'success',
@@ -199,13 +232,13 @@ export class PositronRuntimeAdapter implements RuntimeAdapter {
         error: {
           name: timedOut ? 'ExecutionTimeoutError' : normalized.name,
           message: timedOut
-            ? `Execution exceeded ${clampInteger(timeoutMs, 1000, 600000)} ms and interruption was requested.`
+            ? `Execution exceeded ${effectiveTimeoutMs} ms and interruption was requested.`
             : normalized.message,
           traceback: normalized.stack,
         },
       };
     } finally {
-      clearTimeout(timer);
+      clearTimeout(timer!);
       cancellation.dispose();
     }
   }
@@ -261,8 +294,17 @@ function limitText(value: string, maximum: number): { value: string; truncated: 
 function limitJson(
   value: Record<string, unknown>,
   maximum: number,
-): { value: Record<string, unknown>; truncated: boolean } {
-  const serialized = JSON.stringify(value);
+): { value: Record<string, unknown>; truncated: boolean; unsupported?: string } {
+  let serialized: string;
+  try {
+    serialized = JSON.stringify(value);
+  } catch (error) {
+    return {
+      value: {},
+      truncated: false,
+      unsupported: `The runtime returned a result that cannot be represented as JSON: ${normalizeError(error).message}`,
+    };
+  }
   if (serialized.length <= maximum) return { value, truncated: false };
   return {
     value: {

@@ -47,7 +47,7 @@ export interface VariablesResult {
   truncated: boolean;
 }
 
-export type ExecutionStatus = 'success' | 'error' | 'interrupted' | 'timed_out';
+export type ExecutionStatus = 'success' | 'error' | 'interrupted' | 'timed_out' | 'unsupported_result';
 
 export interface PlotResult {
   mime_type: string;
