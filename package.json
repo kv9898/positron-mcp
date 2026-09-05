@@ -1,6 +1,6 @@
 {
   "name": "positron-codex-mcp",
-  "displayName": "Positron Codex Live Runtime MCP",
+  "displayName": "Positron Codex MCP",
   "description": "Expose the foreground Positron R or Python session to trusted local MCP clients.",
   "version": "0.1.1",
   "publisher": "local",
@@ -60,7 +60,7 @@
       }
     ],
     "configuration": {
-      "title": "Positron Codex Live Runtime MCP",
+      "title": "Positron Codex MCP",
       "properties": {
         "positronCodexMcp.autoStart": {
           "type": "boolean",

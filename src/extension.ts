@@ -98,7 +98,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (!context.globalState.get<boolean>(CODEX_SETUP_NOTICE_KEY, false)) {
         await context.globalState.update(CODEX_SETUP_NOTICE_KEY, true);
         void notifyCodexSetup(
-          `Positron Codex MCP is installed and listening at ${endpoint}. Connect Codex to use the live runtime tools.`,
+          `Positron Codex MCP is installed and listening at ${endpoint}. Connect Codex to use your Positron session tools.`,
           endpoint,
         );
       }

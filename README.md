@@ -1,4 +1,4 @@
-# Positron Codex Live Runtime MCP
+# Positron Codex MCP
 
 This standalone TypeScript extension exposes the **existing foreground Positron R or Python session** to a trusted local MCP client such as Codex. It does not spawn R or Python, proxy OpenAI requests, or handle OpenAI credentials.
 
