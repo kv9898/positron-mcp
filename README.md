@@ -59,6 +59,8 @@ Open this repository as a folder in Positron and use one of these Run and Debug 
 
 Breakpoints in `src/**/*.ts` map through the generated source map. After a watched rebuild, run **Developer: Reload Window** in the Extension Development Host to load the new extension bundle; rebuilding does not hot-replace an already activated extension.
 
+Ctrl+Shift+B runs **pnpm: build**, the default one-shot build task. To start the persistent watcher without launching the debugger, run **Tasks: Run Build Task** and select **pnpm: watch**.
+
 Two additional launch profiles are available for tests:
 
 - **Debug Current Vitest File** runs the currently active test file.
