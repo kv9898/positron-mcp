@@ -5,10 +5,11 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
+import { evaluateTool } from './tools/evaluate';
 import { executeTool } from './tools/execute';
 import { sessionTool } from './tools/session';
 import { variablesTool } from './tools/variables';
-import type { ExecutionMode, ExecutionResult, RuntimeAdapter } from './types';
+import type { EvaluationResult, ExecutionResult, RuntimeAdapter } from './types';
 
 const HOST = '127.0.0.1';
 const PATH = '/mcp';
@@ -16,13 +17,15 @@ const SERVER_INSTRUCTIONS = [
   'Use these tools whenever the user refers to their current or live Positron, R, or Python session, console, interpreter, variables, objects, data, or environment.',
   'Also use them when a requested calculation or analysis may depend on values defined in that session but not included in the prompt or repository files.',
   'Do not ask the user to provide those values before checking Positron.',
-  'First call positron_session, then use positron_variables to discover or inspect relevant objects, and use positron_execute when evaluation or analysis is needed.',
-  'For example, a request to calculate a + b should inspect a and b in Positron and evaluate the expression there.',
+  'First call positron_session, then use positron_variables to discover or inspect relevant objects.',
+  'Use positron_evaluate for calculations, summaries, comparisons, and other inspection that is not intended to change interpreter or external state.',
+  'For example, a request to calculate a + b should inspect a and b in Positron and evaluate the expression with positron_evaluate.',
   'Never claim that no live interpreter exists unless positron_session returns NO_ACTIVE_RUNTIME.',
-  'Use silent execution for operations that do not change interpreter or external state, such as calculations, summaries, and inspection.',
-  'Use transient execution for operations that may create, assign, mutate, or delete objects, load packages, change options or the working directory, consume random-number state, write files, or otherwise have side effects.',
-  'Use non-interactive only when the user also wants the code recorded in console history.',
-  'These tools operate on the existing foreground session and never start a new interpreter. Execution can mutate that live session, so match it to the user\'s intent.',
+  'Use positron_execute for operations that may create, assign, mutate, or delete objects, load packages, change options or the working directory, consume random-number state, create plots, write files, or otherwise have side effects.',
+  'positron_execute is displayed in the console and added to history so state changes remain transparent.',
+  'Its returned result and output are best-effort; do not repeat a state-changing call merely because they are empty. Verify with positron_variables or a separate positron_evaluate call instead.',
+  'Silent evaluation is an intent boundary, not a sandbox: arbitrary R or Python passed to positron_evaluate can still mutate state.',
+  'These tools operate on the existing foreground session and never start a new interpreter.',
 ].join(' ');
 
 export interface McpServerLogger {
@@ -164,13 +167,31 @@ export function createToolServer(runtime: RuntimeAdapter): McpServer {
   );
 
   server.registerTool(
+    'positron_evaluate',
+    {
+      title: 'Evaluate silently in foreground Positron runtime',
+      description: 'Silently evaluate R or Python in the existing foreground Positron session and return its JSON-compatible result plus combined output. Use for calculations, summaries, comparisons, and inspection involving live variables, such as a + b or summary(df). This is intended for non-state-changing code, but it is not a sandbox and cannot enforce read-only behavior.',
+      inputSchema: {
+        code: z.string().min(1).describe('Non-state-changing R or Python code whose result or output is needed.'),
+        timeout_ms: z.number().int().min(1000).max(600000).optional().describe('Evaluation timeout in milliseconds.'),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async input => evaluationToolResponse(runtime, input),
+  );
+
+  server.registerTool(
     'positron_execute',
     {
-      title: 'Execute in foreground Positron runtime',
-      description: 'Evaluate R or Python code in the existing foreground Positron session. Use this for calculations and analyses involving live variables, such as a + b, summaries, transformations, or plots. Choose silent for non-state-changing inspection/calculation and transient for any potentially state-changing operation. It executes against the session identified before dispatch, can mutate that session, and never starts a second interpreter.',
+      title: 'Execute transparently in foreground Positron runtime',
+      description: 'Execute potentially state-changing R or Python code in the existing foreground Positron session. The code is displayed in the console and added to history. Use for assignments, mutation, deletion, package loading, options or working-directory changes, random-number generation, plots, file operations, and other side effects. Returned result/output is best-effort; verify afterward instead of repeating a mutation.',
       inputSchema: {
-        code: z.string().min(1).describe('R or Python code to execute in the live foreground session.'),
-        mode: z.enum(['transient', 'non-interactive', 'silent']).optional().default('silent').describe('Execution visibility/history mode. Choose silent (default) only for read-only calculations or inspection. Choose transient for code that may change interpreter or external state; it is visible but not stored in history. Choose non-interactive only when state-changing code should also be stored in console history.'),
+        code: z.string().min(1).describe('Potentially state-changing R or Python code to execute visibly and record in console history.'),
         timeout_ms: z.number().int().min(1000).max(600000).optional().describe('Execution timeout in milliseconds.'),
       },
       annotations: {
@@ -195,9 +216,24 @@ async function toolResponse(action: () => Promise<unknown>) {
   }
 }
 
+async function evaluationToolResponse(
+  runtime: RuntimeAdapter,
+  input: { code: string; timeout_ms?: number },
+) {
+  try {
+    const value: EvaluationResult = await evaluateTool(runtime, input);
+    return {
+      content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }],
+      isError: !value.success,
+    };
+  } catch (error) {
+    return errorToolResponse(error);
+  }
+}
+
 async function executionToolResponse(
   runtime: RuntimeAdapter,
-  input: { code: string; mode?: ExecutionMode; timeout_ms?: number },
+  input: { code: string; timeout_ms?: number },
 ) {
   try {
     const value = await executeTool(runtime, input);

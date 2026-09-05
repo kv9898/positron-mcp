@@ -2,11 +2,12 @@
 
 This standalone TypeScript extension exposes the **existing foreground Positron R or Python session** to a trusted local MCP client such as Codex. It does not spawn R or Python, proxy OpenAI requests, or handle OpenAI credentials.
 
-The proof of concept provides three tools:
+The proof of concept provides four tools:
 
 - `positron_session` — foreground session/runtime metadata.
 - `positron_variables` — bounded variable metadata, optionally including one object's immediate children.
-- `positron_execute` — controlled code execution in that exact foreground session, with selectable visibility/history mode, stdout, stderr, result/error, timeout status, and static plot attachments where Positron emits them.
+- `positron_evaluate` — silent, result-returning calculation and inspection in that exact foreground session.
+- `positron_execute` — visible, history-recorded state-changing execution, with best-effort output and static plot attachments where Positron emits them.
 
 ## Requirements
 
@@ -92,6 +93,8 @@ The MCP server supplies usage instructions during initialization and gives each 
 
 For example, if `a` and `b` exist only in the Positron Console, a request such as “calculate `a + b`” should lead Codex to discover the live variables and evaluate the expression through this MCP server. Explicitly saying “use Positron” remains a useful override because tool selection is ultimately decided by the MCP client and model.
 
+The server directs calculations, summaries, comparisons, and inspection to `positron_evaluate`. It directs assignments, mutation, package loading, option or working-directory changes, random-number generation, plots, file operations, and other side effects to `positron_execute`. If transparent execution returns no result, Codex is told to verify the state through `positron_variables` or a separate evaluation rather than repeating the mutation.
+
 A separate Codex skill is not required. A skill or project `AGENTS.md` can reinforce this behavior, but it must be installed or added to each relevant project, whereas the MCP instructions and tool descriptions travel with this server automatically.
 
 ## Configure Codex
@@ -144,7 +147,7 @@ Then ask Codex:
 
 > Inspect my current live interpreter. Tell me what variables exist, inspect `df`, then run an appropriate summary and explain anything unusual.
 
-`positron_variables` should see the manually created identity object. `positron_execute` can then mutate it or create another object. Confirm that object immediately in the Positron Console. Because the adapter passes the already acquired foreground `session_id` to `runtime.executeCode`, seeing the mutation from both MCP and Console demonstrates that no subprocess was used.
+`positron_variables` should see the manually created identity object. `positron_evaluate` can summarize `df` without displaying code in the console. `positron_execute` can then mutate the identity object or create another object; this code is displayed and added to console history. Because the adapter passes the already acquired foreground `session_id` to both runtime APIs, seeing the mutation from both MCP and Console demonstrates that no subprocess was used.
 
 ## Tool behavior
 
@@ -162,25 +165,31 @@ Optional arguments:
 
 Without `name`, it lists root variables. With `name`, it returns that variable and at most one level of children. Display values are capped at 2,000 characters and counts are capped, so this is metadata inspection rather than an object dump.
 
+### `positron_evaluate`
+
+```json
+{ "code": "summary(df)", "timeout_ms": 60000 }
+```
+
+Uses Positron's `evaluateCode()` API to run silently and return a JSON-compatible `result` plus combined `output`. It is intended for calculations and inspection that do not change interpreter or external state. It has no plot callback and does not separate stdout from stderr.
+
+Silent evaluation is an intent boundary, not a sandbox: arbitrary R or Python code can still mutate state. The server does not attempt to infer mutation by parsing code.
+
 ### `positron_execute`
 
 ```json
-{ "code": "summary(df)", "mode": "silent", "timeout_ms": 60000 }
+{ "code": "summary_result <- summary(df)", "timeout_ms": 60000 }
 ```
 
-Three execution modes are accepted:
+Uses Positron's `executeCode()` API in `non-interactive` mode. Code is displayed and stored in console history without combining with pending console input. Use it for any potentially state-changing operation, including assignments, mutation, deletion, package loading, option or working-directory changes, random-number generation, plots, and file operations.
 
-- `silent` (default) neither displays execution nor stores it in history. Use it for calculations, summaries, and inspection that do not change interpreter or external state.
-- `transient` displays execution but does not add it to history. Use it for code that may create, assign, mutate, or delete objects or otherwise have side effects.
-- `non-interactive` displays execution and stores it in console history, without combining it with pending console input.
+Returned results, stdout, and stderr are best-effort because Positron does not consistently emit successful execution output through this API. An empty result does not mean execution failed and must not trigger an automatic retry. Verify important state changes with `positron_variables` or a subsequent `positron_evaluate`. Static plots are attached as MCP image content when Positron emits them and the configured output cap does not truncate them.
 
-The MCP instructions make this selection policy explicit to Codex. Operations such as loading packages, changing options or the working directory, consuming random-number state, or writing files count as state-changing and should not use `silent`.
-
-Positron's `interactive` and `unprocessed` modes are intentionally not exposed because they can combine MCP code with pending input in the user's console. The code is sent to the foreground session ID with console focus disabled. Runtime failures, interruption, timeout, and non-JSON result types have distinct statuses. A non-idle runtime is rejected instead of silently queueing work. On timeout the Positron cancellation token requests interruption of the running session. Static plots are attached as MCP image content when the current API emits them and the configured output cap does not truncate them.
+Both code tools reject a non-idle runtime instead of queueing work, request interruption on timeout, and always target the acquired foreground session ID.
 
 ## Security
 
-This endpoint is a privileged local interface: calling `positron_execute` is equivalent to typing arbitrary code into your live interpreter.
+This endpoint is a privileged local interface: both code tools can run arbitrary code in your live interpreter.
 
 - The HTTP listener binds only to `127.0.0.1`, never all interfaces.
 - The MCP SDK's localhost Host-header/DNS-rebinding protection is enabled.
@@ -197,16 +206,18 @@ Other processes running as your local user can generally reach localhost. Stop t
 - `working_directory` is Positron's session metadata value (the starting directory), not a silently evaluated live `getwd()`/`os.getcwd()` value.
 - Variables depend on the language runtime's Positron Variables provider being available.
 - Only immediate variable children are returned; there is no recursive object dumping.
+- Silent evaluation returns combined output and has no plot callback or separate stderr channel.
+- Transparent execution results and successful output are best-effort because of current `executeCode()` observer limitations.
 - Positron's execution observer currently emits only static plots and gives the extension plot data without its MIME type. The adapter detects SVG/JPEG signatures and otherwise treats the payload as PNG.
 - There is no authentication beyond the loopback/network-origin restrictions.
 - Port `0` is intentionally non-stable and requires updating/reloading Codex when it changes; the default fixed port avoids that lifecycle problem.
 
 ## Why Positron core changes are not required
 
-The published public API exposes every operation needed for this proof of concept: `getForegroundSession()`, `getSessionVariables(sessionId, ...)`, and `executeCode(..., observer, sessionId, ...)`. Passing the foreground session ID prevents the documented fallback that may select or start a different session. The extension hosts its own small localhost MCP transport, so Positron core does not need a new server or authentication path.
+The published public API exposes every operation needed for this proof of concept: `getForegroundSession()`, `getSessionVariables(sessionId, ...)`, `evaluateCode(..., sessionId, ...)`, and `executeCode(..., observer, sessionId, ...)`. Passing the foreground session ID prevents the documented fallback that may select or start a different session. The extension hosts its own small localhost MCP transport, so Positron core does not need a new server or authentication path.
 
 ## Remaining gaps vs Posit Assistant
 
-This extension deliberately does not reproduce Posit Assistant. It lacks automatic dataframe profiling, deep table queries, console-history tooling, current Plots-pane introspection, dynamic-widget capture, notebook/editor context, package/module context, UI state, prompt orchestration, and Assistant authentication. The current public API does expose session table queries and privacy-gated console history for a later phase; they are not part of the initial three-tool proof of concept.
+This extension deliberately does not reproduce Posit Assistant. It lacks automatic dataframe profiling, deep table queries, console-history tooling, current Plots-pane introspection, dynamic-widget capture, notebook/editor context, package/module context, UI state, prompt orchestration, and Assistant authentication. The current public API does expose session table queries and privacy-gated console history for a later phase; they are not part of the initial four-tool proof of concept.
 
 See `TECHNICAL_ASSESSMENT.md` for the API and feasibility investigation.

@@ -4,10 +4,10 @@ import { PositronRuntimeAdapter } from '../src/positronRuntime';
 import { NoActiveRuntimeError } from '../src/types';
 import { createCancellationSource, createMockApi } from './helpers';
 
-function adapter(api: PositronApi, timeoutMs = 1000) {
+function adapter(api: PositronApi, timeoutMs = 1000, maxOutputCharacters = 10000) {
   return new PositronRuntimeAdapter(api, createCancellationSource, {
     timeoutMs,
-    maxOutputCharacters: 10000,
+    maxOutputCharacters,
   });
 }
 
@@ -48,30 +48,110 @@ describe('PositronRuntimeAdapter', () => {
     });
   });
 
-  it('captures successful execution from the existing session', async () => {
+  it('silently evaluates code and returns its scalar result and combined output', async () => {
+    const evaluate = vi.fn(async (..._args: Parameters<PositronApi['runtime']['evaluateCode']>) => ({
+      result: 3,
+      output: 'calculated\n',
+    }));
+    const result = await adapter(createMockApi({ evaluate })).evaluate('a + b');
+
+    expect(result).toMatchObject({
+      success: true,
+      status: 'success',
+      mode: 'silent',
+      output: 'calculated\n',
+      result: 3,
+    });
+    expect(evaluate.mock.calls[0]?.[0]).toBe('r');
+    expect(evaluate.mock.calls[0]?.[2]).toBeDefined();
+    expect(evaluate.mock.calls[0]?.[3]).toBe('r-session-1');
+    expect(evaluate.mock.calls[0]?.[4]).toBe('reject');
+  });
+
+  it('truncates silent evaluation output and JSON results', async () => {
+    const result = await adapter(createMockApi({
+      evaluate: async () => ({
+        result: { value: 'abcdefghijklmnop' },
+        output: 'abcdefghijklmnop',
+      }),
+    }), 1000, 10).evaluate('summary(df)');
+
+    expect(result).toMatchObject({
+      success: true,
+      output: 'abcdefghij',
+      result: { truncated: true, preview: '{"value":"' },
+      output_truncated: true,
+    });
+  });
+
+  it('returns silent evaluation errors', async () => {
+    const result = await adapter(createMockApi({
+      evaluate: async () => { throw Object.assign(new Error('object not found'), { name: 'RuntimeError' }); },
+    })).evaluate('missing_object');
+    expect(result).toMatchObject({
+      success: false,
+      status: 'error',
+      mode: 'silent',
+      error: { name: 'RuntimeError', message: 'object not found' },
+    });
+  });
+
+  it('rejects unsupported silent evaluation results', async () => {
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+    const result = await adapter(createMockApi({
+      evaluate: async () => ({ result: cyclic, output: '' }),
+    })).evaluate('value');
+    expect(result).toMatchObject({
+      success: false,
+      status: 'unsupported_result',
+      mode: 'silent',
+      error: { name: 'UnsupportedResultTypeError' },
+    });
+  });
+
+  it('requests cancellation and reports a silent evaluation timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      const resultPromise = adapter(createMockApi({
+        evaluate: async (...args) => new Promise((_resolve, reject) => {
+          args[2]?.onCancellationRequested(() => reject(new Error('cancelled')));
+        }),
+      }), 1000).evaluate('long_running()');
+      await vi.advanceTimersByTimeAsync(1001);
+      await expect(resultPromise).resolves.toMatchObject({
+        success: false,
+        status: 'timed_out',
+        mode: 'silent',
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rejects evaluation and execution while the foreground runtime is busy', async () => {
+    const busy = adapter(createMockApi({ state: 'busy' }));
+    await expect(busy.evaluate('a + b')).rejects.toMatchObject({ name: 'RUNTIME_NOT_IDLE' });
+    await expect(busy.execute('x <- a + b')).rejects.toMatchObject({ name: 'RUNTIME_NOT_IDLE' });
+  });
+
+  it('captures transparent execution output and plots from the existing session', async () => {
     const execute = vi.fn(async (...args: Parameters<PositronApi['runtime']['executeCode']>) => {
       args[6]?.onStarted?.();
       args[6]?.onOutput?.('summary output\n');
+      args[6]?.onPlot?.('iVBORw0KGgo=');
       return { 'text/plain': 'result' };
     });
-    const result = await adapter(createMockApi({ execute })).execute('summary(df)');
-    expect(result).toMatchObject({ success: true, status: 'success', stdout: 'summary output\n' });
+    const result = await adapter(createMockApi({ execute })).execute('x <- summary(df)');
+    expect(result).toMatchObject({
+      success: true,
+      status: 'success',
+      mode: 'non-interactive',
+      stdout: 'summary output\n',
+      plots: [{ mime_type: 'image/png', data: 'iVBORw0KGgo=', truncated: false }],
+    });
     expect(execute.mock.calls[0]?.[7]).toBe('r-session-1');
-    expect(execute.mock.calls[0]?.[4]).toBe('silent');
-    expect(result.mode).toBe('silent');
-  });
-
-  it.each([
-    ['transient', 'transient'],
-    ['non-interactive', 'non-interactive'],
-    ['silent', 'silent'],
-  ] as const)('passes %s execution mode to Positron', async (mode, apiMode) => {
-    const execute = vi.fn(async (..._args: Parameters<PositronApi['runtime']['executeCode']>) => (
-      { 'text/plain': 'result' }
-    ));
-    const result = await adapter(createMockApi({ execute })).execute('a + b', 1000, mode);
-    expect(execute.mock.calls[0]?.[4]).toBe(apiMode);
-    expect(result.mode).toBe(mode);
+    expect(execute.mock.calls[0]?.[4]).toBe('non-interactive');
   });
 
   it('returns runtime execution errors without swallowing them', async () => {

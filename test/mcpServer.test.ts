@@ -13,8 +13,12 @@ const runtime: RuntimeAdapter = {
     session_id: 'session-1', session_name: 'R Console', session_mode: 'console', state: 'idle',
   }),
   getVariables: async () => ({ session_id: 'session-1', language: 'r', variables: [], truncated: false }),
+  evaluate: async () => ({
+    success: true, status: 'success', session_id: 'session-1', language: 'r', mode: 'silent',
+    output: '', result: 3, output_truncated: false, elapsed_ms: 1,
+  }),
   execute: async () => ({
-    success: true, status: 'success', session_id: 'session-1', language: 'r', mode: 'transient',
+    success: true, status: 'success', session_id: 'session-1', language: 'r', mode: 'non-interactive',
     started: true, stdout: '', stderr: '', result: {}, plots: [], output_truncated: false, elapsed_ms: 1,
   }),
 };
@@ -55,31 +59,39 @@ describe('PositronMcpHttpServer', () => {
       );
       expect(client.getInstructions()).toContain('calculate a + b');
       expect(client.getInstructions()).toContain(
-        'Use silent execution for operations that do not change interpreter or external state',
+        'Use positron_evaluate for calculations, summaries, comparisons',
       );
       expect(client.getInstructions()).toContain(
-        'Use transient execution for operations that may create, assign, mutate, or delete objects',
+        'Use positron_execute for operations that may create, assign, mutate, or delete objects',
       );
+      expect(client.getInstructions()).toContain('do not repeat a state-changing call');
       const tools = await client.listTools();
       expect(tools.tools.map(tool => tool.name)).toEqual([
-        'positron_session', 'positron_variables', 'positron_execute',
+        'positron_session', 'positron_variables', 'positron_evaluate', 'positron_execute',
       ]);
       expect(tools.tools.find(tool => tool.name === 'positron_session')?.description)
         .toContain('Never infer that no interpreter exists without calling this tool.');
       expect(tools.tools.find(tool => tool.name === 'positron_variables')?.description)
         .toContain('instead of asking the user for values');
-      expect(tools.tools.find(tool => tool.name === 'positron_execute')?.description)
+      expect(tools.tools.find(tool => tool.name === 'positron_evaluate')?.description)
         .toContain('such as a + b');
+      expect(tools.tools.find(tool => tool.name === 'positron_evaluate')?.inputSchema.properties)
+        .not.toHaveProperty('mode');
       expect(tools.tools.find(tool => tool.name === 'positron_execute')?.description)
-        .toContain('Choose silent for non-state-changing inspection/calculation');
-      expect(tools.tools.find(tool => tool.name === 'positron_execute')?.inputSchema)
-        .toMatchObject({
-          properties: {
-            mode: { default: 'silent', enum: ['transient', 'non-interactive', 'silent'] },
-          },
-        });
-      const result = await client.callTool({ name: 'positron_session', arguments: {} });
-      expect(result.isError).not.toBe(true);
+        .toContain('displayed in the console and added to history');
+      expect(tools.tools.find(tool => tool.name === 'positron_execute')?.inputSchema.properties)
+        .not.toHaveProperty('mode');
+
+      const sessionResult = await client.callTool({ name: 'positron_session', arguments: {} });
+      expect(sessionResult.isError).not.toBe(true);
+      const evaluationResult = await client.callTool({
+        name: 'positron_evaluate', arguments: { code: 'a + b' },
+      });
+      expect(evaluationResult.isError).not.toBe(true);
+      const executionResult = await client.callTool({
+        name: 'positron_execute', arguments: { code: 'x <- a + b' },
+      });
+      expect(executionResult.isError).not.toBe(true);
     } finally {
       await client.close();
     }

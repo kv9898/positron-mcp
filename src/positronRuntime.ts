@@ -5,8 +5,8 @@ import type {
   RuntimeVariable,
 } from '@posit-dev/positron';
 import {
+  type EvaluationResult,
   type ExecutionResult,
-  type ExecutionMode,
   NoActiveRuntimeError,
   type RuntimeAdapter,
   type SessionInfo,
@@ -104,23 +104,94 @@ export class PositronRuntimeAdapter implements RuntimeAdapter {
     };
   }
 
-  async execute(
-    code: string,
-    timeoutMs = this.options.timeoutMs,
-    mode: ExecutionMode = 'silent',
-  ): Promise<ExecutionResult> {
-    if (!code.trim()) {
-      throw namedError('INVALID_ARGUMENT', 'Code must not be empty.');
-    }
+  async evaluate(code: string, timeoutMs = this.options.timeoutMs): Promise<EvaluationResult> {
+    this.validateCode(code);
+    const session = await this.requireIdleForegroundSession();
+    const cancellation = this.createCancellationSource();
+    const startedAt = Date.now();
+    let timedOut = false;
+    const effectiveTimeoutMs = clampInteger(timeoutMs, 1000, 600000);
+    let timer: NodeJS.Timeout;
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        timedOut = true;
+        cancellation.cancel();
+        reject(namedError('ExecutionTimeoutError', `Evaluation exceeded ${effectiveTimeoutMs} ms.`));
+      }, effectiveTimeoutMs);
+    });
 
-    const session = await this.requireForegroundSession();
-    const runtimeState = session.getRuntimeState?.();
-    if (runtimeState && runtimeState !== 'idle') {
-      throw namedError(
-        'RUNTIME_NOT_IDLE',
-        `The foreground Positron runtime is ${runtimeState}; execution was not queued. Wait until it is idle and try again.`,
+    try {
+      const evaluation = this.api.runtime.evaluateCode(
+        session.runtimeMetadata.languageId,
+        code,
+        cancellation.token,
+        session.metadata.sessionId,
+        this.api.RuntimeBusyBehavior.Reject,
       );
+      const value = await Promise.race([evaluation, timeout]);
+      const limitedOutput = limitText(value.output, this.options.maxOutputCharacters);
+      const limitedResult = limitJson(value.result, this.options.maxOutputCharacters);
+      const outputTruncated = limitedOutput.truncated || limitedResult.truncated;
+
+      if (limitedResult.unsupported) {
+        return {
+          success: false,
+          status: 'unsupported_result',
+          session_id: session.metadata.sessionId,
+          language: session.runtimeMetadata.languageId,
+          mode: 'silent',
+          output: limitedOutput.value,
+          result: null,
+          output_truncated: outputTruncated,
+          elapsed_ms: Date.now() - startedAt,
+          error: {
+            name: 'UnsupportedResultTypeError',
+            message: limitedResult.unsupported,
+          },
+        };
+      }
+
+      return {
+        success: true,
+        status: 'success',
+        session_id: session.metadata.sessionId,
+        language: session.runtimeMetadata.languageId,
+        mode: 'silent',
+        output: limitedOutput.value,
+        result: limitedResult.value,
+        output_truncated: outputTruncated,
+        elapsed_ms: Date.now() - startedAt,
+      };
+    } catch (error) {
+      const normalized = normalizeError(error);
+      const interrupted = /interrupt|cancel/i.test(`${normalized.name} ${normalized.message}`);
+      return {
+        success: false,
+        status: timedOut ? 'timed_out' : interrupted ? 'interrupted' : 'error',
+        session_id: session.metadata.sessionId,
+        language: session.runtimeMetadata.languageId,
+        mode: 'silent',
+        output: '',
+        result: null,
+        output_truncated: false,
+        elapsed_ms: Date.now() - startedAt,
+        error: {
+          name: timedOut ? 'ExecutionTimeoutError' : normalized.name,
+          message: timedOut
+            ? `Evaluation exceeded ${effectiveTimeoutMs} ms and interruption was requested.`
+            : normalized.message,
+          traceback: normalized.stack,
+        },
+      };
+    } finally {
+      clearTimeout(timer!);
+      cancellation.dispose();
     }
+  }
+
+  async execute(code: string, timeoutMs = this.options.timeoutMs): Promise<ExecutionResult> {
+    this.validateCode(code);
+    const session = await this.requireIdleForegroundSession();
     const cancellation = this.createCancellationSource();
     const startedAt = Date.now();
     let started = false;
@@ -159,7 +230,7 @@ export class PositronRuntimeAdapter implements RuntimeAdapter {
         code,
         false,
         false,
-        executionMode(this.api, mode),
+        this.api.RuntimeCodeExecutionMode.NonInteractive,
         this.api.RuntimeErrorBehavior.Stop,
         {
           token: cancellation.token,
@@ -190,7 +261,7 @@ export class PositronRuntimeAdapter implements RuntimeAdapter {
           status: 'unsupported_result',
           session_id: session.metadata.sessionId,
           language: session.runtimeMetadata.languageId,
-          mode,
+          mode: 'non-interactive',
           started,
           stdout,
           stderr,
@@ -209,7 +280,7 @@ export class PositronRuntimeAdapter implements RuntimeAdapter {
         status: 'success',
         session_id: session.metadata.sessionId,
         language: session.runtimeMetadata.languageId,
-        mode,
+        mode: 'non-interactive',
         started,
         stdout,
         stderr,
@@ -226,7 +297,7 @@ export class PositronRuntimeAdapter implements RuntimeAdapter {
         status: timedOut ? 'timed_out' : interrupted ? 'interrupted' : 'error',
         session_id: session.metadata.sessionId,
         language: session.runtimeMetadata.languageId,
-        mode,
+        mode: 'non-interactive',
         started,
         stdout,
         stderr,
@@ -256,6 +327,24 @@ export class PositronRuntimeAdapter implements RuntimeAdapter {
     return session;
   }
 
+  private async requireIdleForegroundSession(): Promise<BaseLanguageRuntimeSession> {
+    const session = await this.requireForegroundSession();
+    const runtimeState = session.getRuntimeState?.();
+    if (runtimeState && runtimeState !== 'idle') {
+      throw namedError(
+        'RUNTIME_NOT_IDLE',
+        `The foreground Positron runtime is ${runtimeState}; execution was not queued. Wait until it is idle and try again.`,
+      );
+    }
+    return session;
+  }
+
+  private validateCode(code: string): void {
+    if (!code.trim()) {
+      throw namedError('INVALID_ARGUMENT', 'Code must not be empty.');
+    }
+  }
+
   private mapVariable(variable: RuntimeVariable): VariableInfo {
     const display = limitText(
       variable.display_value,
@@ -271,14 +360,6 @@ export class PositronRuntimeAdapter implements RuntimeAdapter {
       size: variable.size,
       has_children: variable.has_children,
     };
-  }
-}
-
-function executionMode(api: PositronApi, mode: ExecutionMode) {
-  switch (mode) {
-    case 'non-interactive': return api.RuntimeCodeExecutionMode.NonInteractive;
-    case 'silent': return api.RuntimeCodeExecutionMode.Silent;
-    case 'transient': return api.RuntimeCodeExecutionMode.Transient;
   }
 }
 
@@ -305,10 +386,10 @@ function limitText(value: string, maximum: number): { value: string; truncated: 
 }
 
 function limitJson(
-  value: Record<string, unknown>,
+  value: unknown,
   maximum: number,
-): { value: Record<string, unknown>; truncated: boolean; unsupported?: string } {
-  let serialized: string;
+): { value: unknown; truncated: boolean; unsupported?: string } {
+  let serialized: string | undefined;
   try {
     serialized = JSON.stringify(value);
   } catch (error) {
@@ -316,6 +397,13 @@ function limitJson(
       value: {},
       truncated: false,
       unsupported: `The runtime returned a result that cannot be represented as JSON: ${normalizeError(error).message}`,
+    };
+  }
+  if (serialized === undefined) {
+    return {
+      value: null,
+      truncated: false,
+      unsupported: 'The runtime returned a result that cannot be represented as JSON.',
     };
   }
   if (serialized.length <= maximum) return { value, truncated: false };

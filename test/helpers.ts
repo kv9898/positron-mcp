@@ -3,12 +3,14 @@ import type { PositronApi, RuntimeVariable } from '@posit-dev/positron';
 import type { CancellationSourceLike } from '../src/positronRuntime';
 
 type ExecuteImplementation = PositronApi['runtime']['executeCode'];
+type EvaluateImplementation = PositronApi['runtime']['evaluateCode'];
 
 export interface MockApiOptions {
   language?: 'r' | 'python';
   active?: boolean;
   variables?: RuntimeVariable[][];
   execute?: ExecuteImplementation;
+  evaluate?: EvaluateImplementation;
   state?: string;
 }
 
@@ -54,6 +56,10 @@ export function createMockApi(options: MockApiOptions = {}): PositronApi {
     observer?.onFinished?.();
     return result;
   });
+  const evaluate: EvaluateImplementation = options.evaluate ?? (async () => ({
+    result: 42,
+    output: '',
+  }));
 
   return {
     version: '2026.10.0',
@@ -66,12 +72,14 @@ export function createMockApi(options: MockApiOptions = {}): PositronApi {
       Unprocessed: 'unprocessed',
     },
     RuntimeErrorBehavior: { Stop: 'stop', Continue: 'continue' },
+    RuntimeBusyBehavior: { Queue: 'queue', Reject: 'reject' },
     runtime: {
       getForegroundSession: async () => options.active === false ? undefined : session,
       getSessionVariables: async (_sessionId: string, accessKeys?: string[][]) => {
         const variables = options.variables ?? [[]];
         return accessKeys ? variables.slice(1) : variables.slice(0, 1);
       },
+      evaluateCode: evaluate,
       executeCode: execute,
     },
   } as unknown as PositronApi;

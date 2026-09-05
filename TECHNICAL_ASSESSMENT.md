@@ -17,6 +17,7 @@ The following public `runtime` APIs are present in both the installed declaratio
 
 - `getForegroundSession()` returns `BaseLanguageRuntimeSession | undefined`.
 - `getSessionVariables(sessionId, accessKeys?)` returns runtime-supplied variable metadata.
+- `evaluateCode(languageId, code, cancellationToken, sessionId, whenBusy)` silently returns a JSON-coerced value and combined emitted output.
 - `executeCode(languageId, code, focus, allowIncomplete, mode, errorBehavior, observer, sessionId, ...)` returns the MIME-keyed result and reports output, stderr, failures, completion, and static plots through `ExecutionObserver`.
 - `BaseLanguageRuntimeSession.getRuntimeState()` supplies the last known state.
 - The session/runtime metadata supplies IDs, language/runtime names and versions, mode, and optional starting working directory.
@@ -30,6 +31,8 @@ Codex 0.153.2 directly supports local Streamable HTTP MCP servers. `codex mcp ad
 
 - External extensions should not import the injected `positron` module directly. Per the current official guide, this project uses `tryAcquirePositronApi()` from `@posit-dev/positron`; it returns the injected API only in Positron.
 - `executeCode` can start/select a session when `sessionId` is omitted. The adapter first requires a foreground session and always passes its exact ID, preventing that fallback.
+- Silent calculation and inspection use `evaluateCode` with the exact foreground session ID and `RuntimeBusyBehavior.Reject`; this returns results reliably but provides combined output and no plot observer.
+- Potentially state-changing operations use `executeCode` in `NonInteractive` mode so they are displayed and recorded in console history. Successful returned output remains best-effort; clients should verify state rather than repeat a mutation when the result is empty.
 - The variables API returns arrays aligned to access-key requests. The adapter maps those arrays into bounded MCP-friendly metadata and resolves a requested display name to its opaque access key before asking for children.
 - The plot callback supplies a string but not its MIME type. The adapter recognizes SVG and JPEG signatures and otherwise labels it PNG. Dynamic plots are not emitted.
 - A dynamically allocated port conflicts with one-time Codex configuration. The default is therefore the configurable fixed loopback port `37821`; port `0` remains an explicit opt-in for automatic allocation.
@@ -60,6 +63,8 @@ Localhost does not authenticate other same-machine processes. The user must trea
 ## What cannot currently be done faithfully
 
 - Retrieve dynamic plots through `ExecutionObserver`.
+- Obtain plots or separate stdout/stderr from silent `evaluateCode` calls.
+- Reliably capture successful results or stdout from every R and Python `executeCode` call.
 - Reliably determine an emitted plot's MIME type from the public callback alone.
 - Read the current Plots pane through the public runtime execution API.
 - Claim an always-current working directory without evaluating language-specific code; session metadata documents the starting directory.
@@ -73,7 +78,7 @@ The current public API also contains:
 - `querySessionTables(sessionId, accessKeys, queryTypes)` for table summaries;
 - active-session enumeration and foreground-session change events.
 
-They were intentionally left out of the minimal three-tool implementation. Public retrieval of the current Plots-pane contents was not established.
+They were intentionally left out of the minimal four-tool implementation. Public retrieval of the current Plots-pane contents was not established.
 
 ## Conclusion
 

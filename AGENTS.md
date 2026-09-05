@@ -15,8 +15,9 @@ Read `README.md` for user-facing behavior and `TECHNICAL_ASSESSMENT.md` for the 
 - Keep `RuntimeAdapter` in `src/types.ts` as the boundary between MCP transport/tool code and Positron integration. MCP tests should use this interface; Positron adapter tests should use the public-API mock in `test/helpers.ts`.
 - Always pass the acquired foreground `session_id` to runtime operations. Never allow an omitted session ID to select or start another interpreter.
 - A change to an MCP input or result must be reflected together in the Zod schema, shared TypeScript types, adapter/tool plumbing, MCP discovery tests, and user documentation.
-- Keep execution-mode names identical to the public Positron enum values. Do not expose `interactive` or `unprocessed`: both can combine agent code with pending console input.
-- Execution defaults to `silent` for non-state-changing inspection and calculation. Tool guidance must direct state-changing or potentially state-changing code to `transient`, or to `non-interactive` only when console history is explicitly wanted. Do not attempt to infer mutation by parsing arbitrary R or Python code.
+- Preserve the two-tool code boundary: `positron_evaluate` uses `evaluateCode` for silent result-returning inspection, while `positron_execute` uses `executeCode` in `NonInteractive` mode for visible, history-recorded state changes. Do not restore client-selectable execution modes.
+- Silent evaluation is an intent boundary, not enforced read-only execution. Do not attempt to infer mutation by parsing arbitrary R or Python code.
+- Treat transparent execution results and successful output as best-effort. Never retry a potentially state-changing call merely because its result is empty; verify through variables or a separate evaluation.
 
 ## Configuration and lifecycle decisions
 
@@ -30,4 +31,4 @@ Read `README.md` for user-facing behavior and `TECHNICAL_ASSESSMENT.md` for the 
 - Preserve unrelated user changes in a dirty worktree.
 - Keep lifecycle logs metadata-only. Never log tool arguments, executed code, variable contents, results, or credentials.
 - When changing activation, restart, or disposal behavior, verify that active MCP transports and the Node listener are still closed on stop and deactivation.
-- For execution changes, cover success plus relevant timeout, interruption, unsupported-result, state, and mode propagation behavior. The HTTP-level test should continue to exercise initialization and tool discovery through a real loopback Streamable HTTP connection.
+- For code-running changes, cover evaluation and transparent execution success plus relevant timeout, interruption, unsupported-result, state, result/output truncation, and exact session targeting. The HTTP-level test should continue to exercise initialization, discovery, and both code tools through a real loopback Streamable HTTP connection.

@@ -48,7 +48,23 @@ export interface VariablesResult {
 }
 
 export type ExecutionStatus = 'success' | 'error' | 'interrupted' | 'timed_out' | 'unsupported_result';
-export type ExecutionMode = 'transient' | 'non-interactive' | 'silent';
+
+export interface EvaluationResult {
+  success: boolean;
+  status: ExecutionStatus;
+  session_id: string;
+  language: string;
+  mode: 'silent';
+  output: string;
+  result: unknown;
+  output_truncated: boolean;
+  elapsed_ms: number;
+  error?: {
+    name: string;
+    message: string;
+    traceback?: string;
+  };
+}
 
 export interface PlotResult {
   mime_type: string;
@@ -61,11 +77,11 @@ export interface ExecutionResult {
   status: ExecutionStatus;
   session_id: string;
   language: string;
-  mode: ExecutionMode;
+  mode: 'non-interactive';
   started: boolean;
   stdout: string;
   stderr: string;
-  result: Record<string, unknown>;
+  result: unknown;
   plots: PlotResult[];
   output_truncated: boolean;
   elapsed_ms: number;
@@ -79,7 +95,8 @@ export interface ExecutionResult {
 export interface RuntimeAdapter {
   getSession(): Promise<SessionInfo>;
   getVariables(options?: { name?: string; maxVariables?: number }): Promise<VariablesResult>;
-  execute(code: string, timeoutMs?: number, mode?: ExecutionMode): Promise<ExecutionResult>;
+  evaluate(code: string, timeoutMs?: number): Promise<EvaluationResult>;
+  execute(code: string, timeoutMs?: number): Promise<ExecutionResult>;
 }
 
 export class NoActiveRuntimeError extends Error {
