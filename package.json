@@ -37,6 +37,7 @@
     "onCommand:positronCodexMcp.start"
   ],
   "main": "./dist/extension.js",
+  "icon": "images/icon.png",
   "extensionKind": [
     "workspace"
   ],
