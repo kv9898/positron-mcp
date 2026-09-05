@@ -50,10 +50,20 @@ describe('PositronMcpHttpServer', () => {
     const transport = new StreamableHTTPClientTransport(new URL(endpoint));
     try {
       await client.connect(transport);
+      expect(client.getInstructions()).toContain(
+        'Do not ask the user to provide those values before checking Positron.',
+      );
+      expect(client.getInstructions()).toContain('calculate a + b');
       const tools = await client.listTools();
       expect(tools.tools.map(tool => tool.name)).toEqual([
         'positron_session', 'positron_variables', 'positron_execute',
       ]);
+      expect(tools.tools.find(tool => tool.name === 'positron_session')?.description)
+        .toContain('Never infer that no interpreter exists without calling this tool.');
+      expect(tools.tools.find(tool => tool.name === 'positron_variables')?.description)
+        .toContain('instead of asking the user for values');
+      expect(tools.tools.find(tool => tool.name === 'positron_execute')?.description)
+        .toContain('such as a + b');
       const result = await client.callTool({ name: 'positron_session', arguments: {} });
       expect(result.isError).not.toBe(true);
     } finally {

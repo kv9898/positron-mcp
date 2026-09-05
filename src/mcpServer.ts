@@ -12,6 +12,15 @@ import type { ExecutionResult, RuntimeAdapter } from './types';
 
 const HOST = '127.0.0.1';
 const PATH = '/mcp';
+const SERVER_INSTRUCTIONS = [
+  'Use these tools whenever the user refers to their current or live Positron, R, or Python session, console, interpreter, variables, objects, data, or environment.',
+  'Also use them when a requested calculation or analysis may depend on values defined in that session but not included in the prompt or repository files.',
+  'Do not ask the user to provide those values before checking Positron.',
+  'First call positron_session, then use positron_variables to discover or inspect relevant objects, and use positron_execute when evaluation or analysis is needed.',
+  'For example, a request to calculate a + b should inspect a and b in Positron and evaluate the expression there.',
+  'Never claim that no live interpreter exists unless positron_session returns NO_ACTIVE_RUNTIME.',
+  'These tools operate on the existing foreground session and never start a new interpreter. Execution can mutate that live session, so match it to the user\'s intent.',
+].join(' ');
 
 export interface McpServerLogger {
   appendLine(message: string): void;
@@ -123,13 +132,15 @@ export function createToolServer(runtime: RuntimeAdapter): McpServer {
   const server = new McpServer({
     name: 'positron-codex-live-runtime',
     version: '0.1.1',
+  }, {
+    instructions: SERVER_INSTRUCTIONS,
   });
 
   server.registerTool(
     'positron_session',
     {
       title: 'Positron foreground runtime',
-      description: 'Return metadata for the existing foreground Positron R or Python session. Never starts a runtime.',
+      description: 'Check whether an existing foreground Positron R or Python session is active and return its metadata. Use this first whenever the user mentions their current/live interpreter, console, session, variables, or environment. Never infer that no interpreter exists without calling this tool. This tool never starts a runtime.',
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async () => toolResponse(() => sessionTool(runtime)),
@@ -139,7 +150,7 @@ export function createToolServer(runtime: RuntimeAdapter): McpServer {
     'positron_variables',
     {
       title: 'Positron live variables',
-      description: 'List metadata for variables in the foreground live session, or inspect one variable and its immediate children. Values are truncated.',
+      description: 'Discover variables and objects in the foreground Positron session, or inspect one variable and its immediate children. Use this instead of asking the user for values that may already exist in their R or Python interpreter, including names such as a, b, df, or model. Values are truncated.',
       inputSchema: {
         name: z.string().min(1).optional().describe('Optional display name or Positron access key of one variable to inspect.'),
         max_variables: z.number().int().min(1).max(1000).optional().describe('Maximum variables or children to return; default 200.'),
@@ -153,7 +164,7 @@ export function createToolServer(runtime: RuntimeAdapter): McpServer {
     'positron_execute',
     {
       title: 'Execute in foreground Positron runtime',
-      description: 'Execute code transiently in the existing foreground Positron session identified before dispatch. Never starts a second interpreter.',
+      description: 'Evaluate R or Python code in the existing foreground Positron session. Use this for calculations and analyses involving live variables, such as a + b, summaries, transformations, or plots. It executes against the session identified before dispatch, can mutate that session, and never starts a second interpreter.',
       inputSchema: {
         code: z.string().min(1).describe('R or Python code to execute in the live foreground session.'),
         mode: z.literal('transient').optional().default('transient').describe('Only transient execution is supported in this proof of concept.'),

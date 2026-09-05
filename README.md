@@ -86,6 +86,14 @@ The Output panel's **Positron Codex MCP** channel also shows the endpoint. It lo
 
 On first installation, the extension displays a notification offering to copy the Codex MCP setup commands. It also displays an update notification whenever the configured port changes, including changes made directly in Positron Settings. The update action can restart the server and copy replacement Codex commands in one step.
 
+## Helping Codex choose the Positron tools
+
+The MCP server supplies usage instructions during initialization and gives each tool a trigger-oriented description. The guidance tells MCP clients to check Positron whenever a request refers to the current/live R or Python interpreter, console, session, variables, objects, or data that is not present in the prompt or repository. It also tells the client not to ask for those values, or claim that no live interpreter exists, before calling `positron_session`.
+
+For example, if `a` and `b` exist only in the Positron Console, a request such as “calculate `a + b`” should lead Codex to discover the live variables and evaluate the expression through this MCP server. Explicitly saying “use Positron” remains a useful override because tool selection is ultimately decided by the MCP client and model.
+
+A separate Codex skill is not required. A skill or project `AGENTS.md` can reinforce this behavior, but it must be installed or added to each relevant project, whereas the MCP instructions and tool descriptions travel with this server automatically.
+
 ## Configure Codex
 
 Codex CLI 0.153.2 accepts a Streamable HTTP URL directly:
