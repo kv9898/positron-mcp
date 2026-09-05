@@ -8,7 +8,7 @@
   "private": true,
   "engines": {
     "vscode": "^1.103.0",
-    "positron": "^2026.10.0"
+    "positron": "^2026.09.1"
   },
   "categories": [
     "Other"
