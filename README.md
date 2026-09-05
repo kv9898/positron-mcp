@@ -50,6 +50,17 @@ positron --install-extension positron-codex-mcp-0.1.0.vsix
 
 Reload Positron after installation.
 
+## Debug in Positron
+
+Open this repository as a folder in Positron, select **Run and Debug**, choose **Run Positron Extension**, and press F5. The pre-launch task runs `pnpm run build`, then Positron opens an Extension Development Host with this workspace loaded as a development extension. Breakpoints in `src/**/*.ts` map through the generated source map.
+
+Two additional launch profiles are available for tests:
+
+- **Debug Current Vitest File** runs the currently active test file.
+- **Debug All Vitest Tests** runs the complete test suite under the Node debugger.
+
+The current-file profile expects the active editor to be a Vitest test file when launched.
+
 ## Start the server and discover its URL
 
 The server starts after Positron startup by default. The status bar shows **Positron MCP** while it is running. Available commands are:
