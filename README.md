@@ -41,12 +41,12 @@ pnpm run build
 pnpm run package
 ```
 
-The last command creates `positron-codex-mcp-0.0.3.vsix`.
+The last command creates `positron-codex-mcp-0.1.0.vsix`.
 
 Install it from Positron's **Extensions: Install from VSIX...** command, or run:
 
 ```bash
-positron --install-extension positron-codex-mcp-0.0.3.vsix
+positron --install-extension positron-codex-mcp-0.1.0.vsix
 ```
 
 Reload Positron after installation.
