@@ -2,6 +2,7 @@
 .gitignore
 .github/**
 .agents/**
+AGENTS.md
 .codex/**
 .vscode/**
 node_modules/**
