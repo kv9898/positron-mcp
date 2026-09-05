@@ -2,7 +2,7 @@
 
 This standalone TypeScript extension exposes the **existing foreground Positron R or Python session** to a trusted local MCP client such as Codex. It does not spawn R or Python, proxy OpenAI requests, or handle OpenAI credentials.
 
-The proof of concept provides four tools:
+The extension provides four tools:
 
 - `positron_session` — foreground session/runtime metadata.
 - `positron_variables` — bounded variable metadata, optionally including one object's immediate children.
@@ -198,7 +198,7 @@ This endpoint is a privileged local interface: both code tools can run arbitrary
 - No credentials are accepted, forwarded, or logged.
 - Tool inputs and variable contents are not logged.
 
-Other processes running as your local user can generally reach localhost. Stop the server when it is not needed, and do not forward or proxy its port. This proof of concept intentionally has no bearer token because its endpoint must remain easy for the local Codex client to use; loopback is a boundary, not strong authentication.
+Other processes running as your local user can generally reach localhost. Stop the server when it is not needed, and do not forward or proxy its port. The endpoint has no bearer token because it must remain easy for the local Codex client to use; loopback is a boundary, not strong authentication.
 
 ## Current limitations
 
@@ -214,10 +214,10 @@ Other processes running as your local user can generally reach localhost. Stop t
 
 ## Why Positron core changes are not required
 
-The published public API exposes every operation needed for this proof of concept: `getForegroundSession()`, `getSessionVariables(sessionId, ...)`, `evaluateCode(..., sessionId, ...)`, and `executeCode(..., observer, sessionId, ...)`. Passing the foreground session ID prevents the documented fallback that may select or start a different session. The extension hosts its own small localhost MCP transport, so Positron core does not need a new server or authentication path.
+The published public API exposes every operation needed by this extension: `getForegroundSession()`, `getSessionVariables(sessionId, ...)`, `evaluateCode(..., sessionId, ...)`, and `executeCode(..., observer, sessionId, ...)`. Passing the foreground session ID prevents the documented fallback that may select or start a different session. The extension hosts its own small localhost MCP transport, so Positron core does not need a new server or authentication path.
 
 ## Remaining gaps vs Posit Assistant
 
-This extension deliberately does not reproduce Posit Assistant. It lacks automatic dataframe profiling, deep table queries, console-history tooling, current Plots-pane introspection, dynamic-widget capture, notebook/editor context, package/module context, UI state, prompt orchestration, and Assistant authentication. The current public API does expose session table queries and privacy-gated console history for a later phase; they are not part of the initial four-tool proof of concept.
+This extension deliberately does not reproduce Posit Assistant. It lacks automatic dataframe profiling, deep table queries, console-history tooling, current Plots-pane introspection, dynamic-widget capture, notebook/editor context, package/module context, UI state, prompt orchestration, and Assistant authentication. The current public API does expose session table queries and privacy-gated console history; they are not part of the current four-tool interface.
 
 See `TECHNICAL_ASSESSMENT.md` for the API and feasibility investigation.
