@@ -2,7 +2,7 @@
   "name": "positron-codex-mcp",
   "displayName": "Positron Codex MCP",
   "description": "Expose the foreground Positron R or Python session to trusted local MCP clients.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "publisher": "local",
   "author": {
     "name": "Dianyi Yang",
