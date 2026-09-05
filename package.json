@@ -2,7 +2,7 @@
   "name": "positron-codex-mcp",
   "displayName": "Positron Codex Live Runtime MCP",
   "description": "Expose the foreground Positron R or Python session to trusted local MCP clients.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "local",
   "license": "MIT",
   "private": true,
@@ -65,10 +65,10 @@
         },
         "positronCodexMcp.port": {
           "type": "integer",
-          "default": 0,
+          "default": 37821,
           "minimum": 0,
           "maximum": 65535,
-          "description": "Local TCP port. Use 0 to select a free port automatically; set a fixed port for one-time Codex configuration."
+          "description": "Stable local TCP port used by Codex. The default is 37821. Use 0 only when you explicitly want a new automatically selected port."
         },
         "positronCodexMcp.executionTimeoutMs": {
           "type": "integer",

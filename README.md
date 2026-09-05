@@ -40,12 +40,12 @@ pnpm run build
 pnpm run package
 ```
 
-The last command creates `positron-codex-mcp-0.1.0.vsix`.
+The last command creates `positron-codex-mcp-0.1.1.vsix`.
 
 Install it from Positron's **Extensions: Install from VSIX...** command, or run:
 
 ```bash
-positron --install-extension positron-codex-mcp-0.1.0.vsix
+positron --install-extension positron-codex-mcp-0.1.1.vsix
 ```
 
 Reload Positron after installation.
@@ -81,14 +81,14 @@ The server starts after Positron startup by default. The status bar shows **Posi
 
 The Output panel's **Positron Codex MCP** channel also shows the endpoint. It logs lifecycle events, never tool arguments or variable contents.
 
-`positronCodexMcp.port` defaults to `0`, asking the operating system for a free port. This is conflict-resistant, but the URL can change after a restart. For one-time Codex configuration, choose an unused fixed port in Positron settings (for example `37821`) and restart the MCP server.
+`positronCodexMcp.port` defaults to the stable loopback port `37821`. This keeps the MCP URL unchanged across Positron restarts, so Codex only needs to be configured once. If that port conflicts with another local service, choose another fixed port in Positron settings and restart the MCP server. Port `0` remains available as an explicit opt-in to automatic, non-stable port selection.
 
 ## Configure Codex
 
 Codex CLI 0.153.2 accepts a Streamable HTTP URL directly:
 
 ```bash
-codex mcp add positron --url http://127.0.0.1:<PORT>/mcp
+codex mcp add positron --url http://127.0.0.1:37821/mcp
 codex mcp get positron
 ```
 
@@ -96,10 +96,19 @@ Equivalent `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.positron]
-url = "http://127.0.0.1:<PORT>/mcp"
+url = "http://127.0.0.1:37821/mcp"
 ```
 
-Replace `<PORT>` with the status-bar/Output value. If automatic port selection produces a new port, remove and re-add the entry or edit the TOML. No OpenAI API key is needed by this extension; Codex continues to use its own normal account authentication.
+The Codex CLI and IDE extension share this configuration, but an already-running Codex host may retain the MCP catalog created at startup. After adding or changing the server, run **Developer: Reload Window** in Positron once. The fixed port means subsequent Positron starts do not require another `codex mcp add`.
+
+If an older installation already registered a random port, replace it once:
+
+```bash
+codex mcp remove positron
+codex mcp add positron --url http://127.0.0.1:37821/mcp
+```
+
+Then reload the Positron window. No OpenAI API key is needed by this extension; Codex continues to use its own normal account authentication.
 
 ## Example use
 
@@ -171,7 +180,7 @@ Other processes running as your local user can generally reach localhost. Stop t
 - Only immediate variable children are returned; there is no recursive object dumping.
 - Positron's execution observer currently emits only static plots and gives the extension plot data without its MIME type. The adapter detects SVG/JPEG signatures and otherwise treats the payload as PNG.
 - There is no authentication beyond the loopback/network-origin restrictions.
-- Dynamic ports require updating Codex after an extension-host restart; set a fixed port for durable configuration.
+- Port `0` is intentionally non-stable and requires updating/reloading Codex when it changes; the default fixed port avoids that lifecycle problem.
 
 ## Why Positron core changes are not required
 

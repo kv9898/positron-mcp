@@ -32,7 +32,7 @@ Codex 0.153.2 directly supports local Streamable HTTP MCP servers. `codex mcp ad
 - `executeCode` can start/select a session when `sessionId` is omitted. The adapter first requires a foreground session and always passes its exact ID, preventing that fallback.
 - The variables API returns arrays aligned to access-key requests. The adapter maps those arrays into bounded MCP-friendly metadata and resolves a requested display name to its opaque access key before asking for children.
 - The plot callback supplies a string but not its MIME type. The adapter recognizes SVG and JPEG signatures and otherwise labels it PNG. Dynamic plots are not emitted.
-- A dynamically allocated port conflicts with one-time Codex configuration. The default remains port `0` for safety/convenience, while a configurable fixed port provides stable configuration.
+- A dynamically allocated port conflicts with one-time Codex configuration. The default is therefore the configurable fixed loopback port `37821`; port `0` remains an explicit opt-in for automatic allocation.
 
 ## Stability
 
