@@ -130,7 +130,7 @@ Without `name`, it lists root variables. With `name`, it returns that variable a
 { "code": "summary(df)", "mode": "transient", "timeout_ms": 60000 }
 ```
 
-Only `transient` mode is accepted. The code is sent to the foreground session ID with console focus disabled. Runtime failures, interruption, and timeout have distinct statuses. On timeout the Positron cancellation token requests interruption of the running session. Static plots are attached as MCP image content when the current API emits them and the configured output cap does not truncate them.
+Only `transient` mode is accepted. The code is sent to the foreground session ID with console focus disabled. Runtime failures, interruption, timeout, and non-JSON result types have distinct statuses. A non-idle runtime is rejected instead of silently queueing work. On timeout the Positron cancellation token requests interruption of the running session. Static plots are attached as MCP image content when the current API emits them and the configured output cap does not truncate them.
 
 ## Security
 
@@ -163,4 +163,4 @@ The published public API exposes every operation needed for this proof of concep
 
 This extension deliberately does not reproduce Posit Assistant. It lacks automatic dataframe profiling, deep table queries, console-history tooling, current Plots-pane introspection, dynamic-widget capture, notebook/editor context, package/module context, UI state, prompt orchestration, and Assistant authentication. The current public API does expose session table queries and privacy-gated console history for a later phase; they are not part of the initial three-tool proof of concept.
 
-See [TECHNICAL_ASSESSMENT.md](TECHNICAL_ASSESSMENT.md) for the API and feasibility investigation.
+See `TECHNICAL_ASSESSMENT.md` for the API and feasibility investigation.
