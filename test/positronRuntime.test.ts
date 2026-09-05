@@ -65,7 +65,9 @@ describe('PositronRuntimeAdapter', () => {
     ['non-interactive', 'non-interactive'],
     ['silent', 'silent'],
   ] as const)('passes %s execution mode to Positron', async (mode, apiMode) => {
-    const execute = vi.fn(async () => ({ 'text/plain': 'result' }));
+    const execute = vi.fn(async (..._args: Parameters<PositronApi['runtime']['executeCode']>) => (
+      { 'text/plain': 'result' }
+    ));
     const result = await adapter(createMockApi({ execute })).execute('a + b', 1000, mode);
     expect(execute.mock.calls[0]?.[4]).toBe(apiMode);
     expect(result.mode).toBe(mode);
