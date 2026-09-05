@@ -78,6 +78,17 @@ describe('PositronRuntimeAdapter', () => {
     expect(result.status).toBe('interrupted');
   });
 
+  it('distinguishes an unsupported non-JSON result', async () => {
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+    const result = await adapter(createMockApi({ execute: async () => cyclic })).execute('value');
+    expect(result).toMatchObject({
+      success: false,
+      status: 'unsupported_result',
+      error: { name: 'UnsupportedResultTypeError' },
+    });
+  });
+
   it('requests interruption and reports a timeout', async () => {
     vi.useFakeTimers();
     try {
