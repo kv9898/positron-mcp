@@ -1,0 +1,11 @@
+.git/**
+.github/**
+.agents/**
+.codex/**
+node_modules/**
+src/**
+test/**
+*.map
+tsconfig.json
+esbuild.mjs
+pnpm-lock.yaml

@@ -1,0 +1,108 @@
+{
+  "name": "positron-codex-mcp",
+  "displayName": "Positron Codex Live Runtime MCP",
+  "description": "Expose the foreground Positron R or Python session to trusted local MCP clients.",
+  "version": "0.1.0",
+  "publisher": "local",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "vscode": "^1.103.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "positron",
+    "mcp",
+    "codex",
+    "r",
+    "python"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:positronCodexMcp.start"
+  ],
+  "main": "./dist/extension.js",
+  "extensionKind": [
+    "workspace"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "positronCodexMcp.start",
+        "title": "Positron Codex: Start MCP Server"
+      },
+      {
+        "command": "positronCodexMcp.stop",
+        "title": "Positron Codex: Stop MCP Server"
+      },
+      {
+        "command": "positronCodexMcp.restart",
+        "title": "Positron Codex: Restart MCP Server"
+      },
+      {
+        "command": "positronCodexMcp.showEndpoint",
+        "title": "Positron Codex: Show MCP Endpoint"
+      },
+      {
+        "command": "positronCodexMcp.copyEndpoint",
+        "title": "Positron Codex: Copy MCP Endpoint"
+      },
+      {
+        "command": "positronCodexMcp.showDiagnostics",
+        "title": "Positron Codex: Show Diagnostics"
+      }
+    ],
+    "configuration": {
+      "title": "Positron Codex Live Runtime MCP",
+      "properties": {
+        "positronCodexMcp.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Start the localhost MCP server when Positron finishes starting."
+        },
+        "positronCodexMcp.port": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 65535,
+          "description": "Local TCP port. Use 0 to select a free port automatically; set a fixed port for one-time Codex configuration."
+        },
+        "positronCodexMcp.executionTimeoutMs": {
+          "type": "integer",
+          "default": 60000,
+          "minimum": 1000,
+          "maximum": 600000,
+          "description": "Maximum time to wait for a live-runtime execution before requesting interruption."
+        },
+        "positronCodexMcp.maxOutputCharacters": {
+          "type": "integer",
+          "default": 100000,
+          "minimum": 1000,
+          "maximum": 1000000,
+          "description": "Maximum captured characters for each stdout/stderr stream and serialized execution result."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "package": "pnpm run build && vsce package --no-dependencies"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/vscode": "^1.103.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}
