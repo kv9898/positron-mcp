@@ -3,6 +3,7 @@
 .github/**
 .agents/**
 .codex/**
+.vscode/**
 node_modules/**
 src/**
 test/**
