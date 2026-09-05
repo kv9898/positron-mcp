@@ -134,7 +134,7 @@ export class PositronMcpHttpServer {
 export function createToolServer(runtime: RuntimeAdapter): McpServer {
   const server = new McpServer({
     name: 'positron-codex-live-runtime',
-    version: '0.1.1',
+    version: '0.0.2',
   }, {
     instructions: SERVER_INSTRUCTIONS,
   });
