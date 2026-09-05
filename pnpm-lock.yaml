@@ -11,6 +11,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: 1.30.0
         version: 1.30.0(zod@3.25.76)
+      '@posit-dev/positron':
+        specifier: 0.2.10
+        version: 0.2.10(@types/vscode@1.136.0)
       zod:
         specifier: ^3.25.76
         version: 3.25.76
@@ -445,6 +448,12 @@ packages:
   '@nodelib/fs.walk@1.2.8':
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
+
+  '@posit-dev/positron@0.2.10':
+    resolution: {integrity: sha512-CxJg5cTOy7QPt9FjO9m0NHbFBRQnlN+APW+Zr3j/7AWGe7RiDy19xLugfpyR8kyKZWsS9gFGeFjnqfL1zQHzow==}
+    engines: {node: '>=16.0.0'}
+    peerDependencies:
+      '@types/vscode': ^1.74.0
 
   '@rollup/rollup-android-arm-eabi@4.63.1':
     resolution: {integrity: sha512-UZ8sUxPTiHWYX9QNdJedb1kDZSpS1t/VPWBWGSgqHNi9w3Cu6IXvu2mzbhiTiPvtrqgTQJ+zqiAq2iPIPilpaQ==}
@@ -2403,6 +2412,10 @@ snapshots:
     dependencies:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.3
+
+  '@posit-dev/positron@0.2.10(@types/vscode@1.136.0)':
+    dependencies:
+      '@types/vscode': 1.136.0
 
   '@rollup/rollup-android-arm-eabi@4.63.1':
     optional: true
