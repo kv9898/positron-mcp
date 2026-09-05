@@ -165,14 +165,16 @@ Without `name`, it lists root variables. With `name`, it returns that variable a
 ### `positron_execute`
 
 ```json
-{ "code": "summary(df)", "mode": "transient", "timeout_ms": 60000 }
+{ "code": "summary(df)", "mode": "silent", "timeout_ms": 60000 }
 ```
 
 Three execution modes are accepted:
 
-- `transient` (default) displays execution in the console but does not add it to history.
+- `silent` (default) neither displays execution nor stores it in history. Use it for calculations, summaries, and inspection that do not change interpreter or external state.
+- `transient` displays execution but does not add it to history. Use it for code that may create, assign, mutate, or delete objects or otherwise have side effects.
 - `non-interactive` displays execution and stores it in console history, without combining it with pending console input.
-- `silent` neither displays execution nor stores it in history. MCP guidance tells Codex to use this only when the user explicitly requests hidden execution.
+
+The MCP instructions make this selection policy explicit to Codex. Operations such as loading packages, changing options or the working directory, consuming random-number state, or writing files count as state-changing and should not use `silent`.
 
 Positron's `interactive` and `unprocessed` modes are intentionally not exposed because they can combine MCP code with pending input in the user's console. The code is sent to the foreground session ID with console focus disabled. Runtime failures, interruption, timeout, and non-JSON result types have distinct statuses. A non-idle runtime is rejected instead of silently queueing work. On timeout the Positron cancellation token requests interruption of the running session. Static plots are attached as MCP image content when the current API emits them and the configured output cap does not truncate them.
 

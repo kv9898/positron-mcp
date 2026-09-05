@@ -57,7 +57,8 @@ describe('PositronRuntimeAdapter', () => {
     const result = await adapter(createMockApi({ execute })).execute('summary(df)');
     expect(result).toMatchObject({ success: true, status: 'success', stdout: 'summary output\n' });
     expect(execute.mock.calls[0]?.[7]).toBe('r-session-1');
-    expect(execute.mock.calls[0]?.[4]).toBe('transient');
+    expect(execute.mock.calls[0]?.[4]).toBe('silent');
+    expect(result.mode).toBe('silent');
   });
 
   it.each([

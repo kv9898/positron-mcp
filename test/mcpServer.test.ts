@@ -54,6 +54,12 @@ describe('PositronMcpHttpServer', () => {
         'Do not ask the user to provide those values before checking Positron.',
       );
       expect(client.getInstructions()).toContain('calculate a + b');
+      expect(client.getInstructions()).toContain(
+        'Use silent execution for operations that do not change interpreter or external state',
+      );
+      expect(client.getInstructions()).toContain(
+        'Use transient execution for operations that may create, assign, mutate, or delete objects',
+      );
       const tools = await client.listTools();
       expect(tools.tools.map(tool => tool.name)).toEqual([
         'positron_session', 'positron_variables', 'positron_execute',
@@ -64,8 +70,14 @@ describe('PositronMcpHttpServer', () => {
         .toContain('instead of asking the user for values');
       expect(tools.tools.find(tool => tool.name === 'positron_execute')?.description)
         .toContain('such as a + b');
+      expect(tools.tools.find(tool => tool.name === 'positron_execute')?.description)
+        .toContain('Choose silent for non-state-changing inspection/calculation');
       expect(tools.tools.find(tool => tool.name === 'positron_execute')?.inputSchema)
-        .toMatchObject({ properties: { mode: { enum: ['transient', 'non-interactive', 'silent'] } } });
+        .toMatchObject({
+          properties: {
+            mode: { default: 'silent', enum: ['transient', 'non-interactive', 'silent'] },
+          },
+        });
       const result = await client.callTool({ name: 'positron_session', arguments: {} });
       expect(result.isError).not.toBe(true);
     } finally {

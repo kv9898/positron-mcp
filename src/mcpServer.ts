@@ -19,7 +19,9 @@ const SERVER_INSTRUCTIONS = [
   'First call positron_session, then use positron_variables to discover or inspect relevant objects, and use positron_execute when evaluation or analysis is needed.',
   'For example, a request to calculate a + b should inspect a and b in Positron and evaluate the expression there.',
   'Never claim that no live interpreter exists unless positron_session returns NO_ACTIVE_RUNTIME.',
-  'Use transient execution by default. Use non-interactive only when the user wants code recorded in console history, and silent only when the user explicitly wants no console display.',
+  'Use silent execution for operations that do not change interpreter or external state, such as calculations, summaries, and inspection.',
+  'Use transient execution for operations that may create, assign, mutate, or delete objects, load packages, change options or the working directory, consume random-number state, write files, or otherwise have side effects.',
+  'Use non-interactive only when the user also wants the code recorded in console history.',
   'These tools operate on the existing foreground session and never start a new interpreter. Execution can mutate that live session, so match it to the user\'s intent.',
 ].join(' ');
 
@@ -165,10 +167,10 @@ export function createToolServer(runtime: RuntimeAdapter): McpServer {
     'positron_execute',
     {
       title: 'Execute in foreground Positron runtime',
-      description: 'Evaluate R or Python code in the existing foreground Positron session. Use this for calculations and analyses involving live variables, such as a + b, summaries, transformations, or plots. It executes against the session identified before dispatch, can mutate that session, and never starts a second interpreter.',
+      description: 'Evaluate R or Python code in the existing foreground Positron session. Use this for calculations and analyses involving live variables, such as a + b, summaries, transformations, or plots. Choose silent for non-state-changing inspection/calculation and transient for any potentially state-changing operation. It executes against the session identified before dispatch, can mutate that session, and never starts a second interpreter.',
       inputSchema: {
         code: z.string().min(1).describe('R or Python code to execute in the live foreground session.'),
-        mode: z.enum(['transient', 'non-interactive', 'silent']).optional().default('transient').describe('Execution visibility/history mode. transient (default): visible, not stored in history. non-interactive: visible and stored in history. silent: not displayed and not stored; use only when the user explicitly requests hidden execution.'),
+        mode: z.enum(['transient', 'non-interactive', 'silent']).optional().default('silent').describe('Execution visibility/history mode. Choose silent (default) only for read-only calculations or inspection. Choose transient for code that may change interpreter or external state; it is visible but not stored in history. Choose non-interactive only when state-changing code should also be stored in console history.'),
         timeout_ms: z.number().int().min(1000).max(600000).optional().describe('Execution timeout in milliseconds.'),
       },
       annotations: {

@@ -107,7 +107,7 @@ export class PositronRuntimeAdapter implements RuntimeAdapter {
   async execute(
     code: string,
     timeoutMs = this.options.timeoutMs,
-    mode: ExecutionMode = 'transient',
+    mode: ExecutionMode = 'silent',
   ): Promise<ExecutionResult> {
     if (!code.trim()) {
       throw namedError('INVALID_ARGUMENT', 'Code must not be empty.');
