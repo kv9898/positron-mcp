@@ -1,0 +1,96 @@
+name: Publish Extension
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing v-prefixed Git tag to publish
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+jobs:
+  package:
+    name: Verify and package VSIX
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release_metadata.outputs.version }}
+
+    steps:
+      - name: Check out the release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.8.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.20.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify release metadata
+        id: release_metadata
+        shell: bash
+        run: |
+          version="$(node --input-type=module --eval \"import manifest from './package.json' with { type: 'json' }; process.stdout.write(manifest.version)\")"
+          test "$RELEASE_TAG" = "v$version"
+          grep --fixed-strings --quiet "## [$version]" CHANGELOG.md
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Type-check
+        run: pnpm run check
+
+      - name: Test
+        run: pnpm test
+
+      - name: Package VSIX
+        run: pnpm run package
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-vsix
+          path: positron-codex-mcp-${{ steps.release_metadata.outputs.version }}.vsix
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub release
+    needs: package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download VSIX artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: extension-vsix
+          path: release-assets
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$RELEASE_TAG" release-assets/positron-codex-mcp-${{ needs.package.outputs.version }}.vsix
+          --verify-tag
+          --title "Positron Codex MCP ${{ needs.package.outputs.version }}"
+          --generate-notes
