@@ -51,6 +51,10 @@
         "title": "Positron Codex: Copy MCP Endpoint"
       },
       {
+        "command": "positronCodexMcp.copyCodexSetup",
+        "title": "Positron Codex: Copy Codex MCP Setup Commands"
+      },
+      {
         "command": "positronCodexMcp.showDiagnostics",
         "title": "Positron Codex: Show Diagnostics"
       }
@@ -68,6 +72,7 @@
           "default": 37821,
           "minimum": 0,
           "maximum": 65535,
+          "scope": "window",
           "description": "Stable local TCP port used by Codex. The default is 37821. Use 0 only when you explicitly want a new automatically selected port."
         },
         "positronCodexMcp.executionTimeoutMs": {

@@ -77,11 +77,14 @@ The server starts after Positron startup by default. The status bar shows **Posi
 - `Positron Codex: Restart MCP Server`
 - `Positron Codex: Show MCP Endpoint`
 - `Positron Codex: Copy MCP Endpoint`
+- `Positron Codex: Copy Codex MCP Setup Commands`
 - `Positron Codex: Show Diagnostics`
 
 The Output panel's **Positron Codex MCP** channel also shows the endpoint. It logs lifecycle events, never tool arguments or variable contents.
 
-`positronCodexMcp.port` defaults to the stable loopback port `37821`. This keeps the MCP URL unchanged across Positron restarts, so Codex only needs to be configured once. If that port conflicts with another local service, choose another fixed port in Positron settings and restart the MCP server. Port `0` remains available as an explicit opt-in to automatic, non-stable port selection.
+`positronCodexMcp.port` defaults to the stable loopback port `37821`. This keeps the MCP URL unchanged across Positron restarts, so Codex only needs to be configured once. Change it through the `positronCodexMcp.port` user setting in Positron Settings. Port `0` remains available as an explicit opt-in to automatic, non-stable port selection.
+
+On first installation, the extension displays a notification offering to copy the Codex MCP setup commands. It also displays an update notification whenever the configured port changes, including changes made directly in Positron Settings. The update action can restart the server and copy replacement Codex commands in one step.
 
 ## Configure Codex
 

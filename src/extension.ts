@@ -1,7 +1,10 @@
 import * as vscode from 'vscode';
 import { tryAcquirePositronApi } from '@posit-dev/positron';
+import { codexSetupCommands, endpointForFixedPort } from './codexSetup';
 import { PositronMcpHttpServer } from './mcpServer';
 import { PositronRuntimeAdapter } from './positronRuntime';
+
+const CODEX_SETUP_NOTICE_KEY = 'positronCodexMcp.hasShownCodexSetupV1';
 
 let server: PositronMcpHttpServer | undefined;
 let output: vscode.OutputChannel | undefined;
@@ -21,6 +24,43 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     status.text = '$(warning) Positron MCP unavailable';
     status.tooltip = 'This extension requires Positron and its public extension API.';
   }
+
+  let configuredPort = vscode.workspace
+    .getConfiguration('positronCodexMcp')
+    .get<number>('port', 37821);
+
+  const copyCodexSetup = async (endpoint?: string) => {
+    const resolvedEndpoint = endpoint ?? server?.endpoint ?? endpointForFixedPort(configuredPort);
+    if (!resolvedEndpoint) {
+      void vscode.window.showWarningMessage(
+        'Start the MCP server first so its automatically allocated port can be included in the Codex setup command.',
+      );
+      return;
+    }
+    await vscode.env.clipboard.writeText(codexSetupCommands(resolvedEndpoint));
+    void vscode.window.showInformationMessage(
+      'Codex MCP setup commands copied. Run them, then use Developer: Reload Window so the Codex IDE extension refreshes its tools.',
+    );
+  };
+
+  const notifyCodexSetup = async (message: string, endpoint?: string) => {
+    const action = await vscode.window.showInformationMessage(
+      message,
+      'Copy Codex Setup',
+      'Show Instructions',
+    );
+    if (action === 'Copy Codex Setup') await copyCodexSetup(endpoint);
+    if (action === 'Show Instructions') {
+      const upperCaseReadme = vscode.Uri.joinPath(context.extensionUri, 'README.md');
+      const lowerCaseReadme = vscode.Uri.joinPath(context.extensionUri, 'readme.md');
+      const readme = await vscode.workspace.fs.stat(upperCaseReadme)
+        .then(() => upperCaseReadme, () => lowerCaseReadme);
+      await vscode.commands.executeCommand(
+        'markdown.showPreview',
+        readme,
+      );
+    }
+  };
 
   const start = async () => {
     if (!api) {
@@ -54,6 +94,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       output!.appendLine(`[Extension] Positron ${api.version} build ${api.buildNumber}`);
       output!.appendLine('[Security] This endpoint can execute arbitrary code in the foreground live interpreter.');
       output!.appendLine('[Security] Bound to IPv4 loopback only; no secrets are logged.');
+
+      if (!context.globalState.get<boolean>(CODEX_SETUP_NOTICE_KEY, false)) {
+        await context.globalState.update(CODEX_SETUP_NOTICE_KEY, true);
+        void notifyCodexSetup(
+          `Positron Codex MCP is installed and listening at ${endpoint}. Connect Codex to use the live runtime tools.`,
+          endpoint,
+        );
+      }
     } catch (error) {
       await candidate.stop().catch(() => undefined);
       setStoppedStatus();
@@ -93,6 +141,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       await vscode.env.clipboard.writeText(server.endpoint);
       void vscode.window.showInformationMessage('Positron MCP endpoint copied.');
     }),
+    vscode.commands.registerCommand('positronCodexMcp.copyCodexSetup', () => copyCodexSetup()),
     vscode.commands.registerCommand('positronCodexMcp.showDiagnostics', async () => {
       output!.appendLine(`[Diagnostics] extension=0.1.1 positron=${api?.version ?? 'unavailable'} build=${api?.buildNumber ?? 'unavailable'} endpoint=${server?.endpoint ?? 'stopped'}`);
       if (api) {
@@ -102,7 +151,34 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       output!.show(true);
     }),
     vscode.workspace.onDidChangeConfiguration(event => {
-      if (event.affectsConfiguration('positronCodexMcp') && server?.endpoint) {
+      if (event.affectsConfiguration('positronCodexMcp.port')) {
+        const previousPort = configuredPort;
+        configuredPort = vscode.workspace
+          .getConfiguration('positronCodexMcp')
+          .get<number>('port', 37821);
+        output!.appendLine(`[Extension] User-level MCP port changed from ${previousPort} to ${configuredPort}.`);
+
+        void (async () => {
+          const action = await vscode.window.showInformationMessage(
+            `The MCP port changed from ${previousPort} to ${configuredPort}. Restart the server and update Codex to use the new endpoint.`,
+            'Restart & Copy Setup',
+            'Copy Setup Only',
+          );
+          if (action === 'Restart & Copy Setup') {
+            await restart();
+            await copyCodexSetup();
+          }
+          if (action === 'Copy Setup Only') {
+            const endpoint = endpointForFixedPort(configuredPort);
+            if (endpoint) await copyCodexSetup(endpoint);
+            else {
+              void vscode.window.showWarningMessage(
+                'Port 0 is allocated only when the server starts. Restart the server before copying its new Codex setup commands.',
+              );
+            }
+          }
+        })();
+      } else if (event.affectsConfiguration('positronCodexMcp') && server?.endpoint) {
         output!.appendLine('[Extension] Configuration changed; restart the MCP server to apply it.');
       }
     }),
