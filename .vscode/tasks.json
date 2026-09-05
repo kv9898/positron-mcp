@@ -22,6 +22,35 @@
         "panel": "dedicated",
         "clear": true
       }
+    },
+    {
+      "label": "pnpm: watch",
+      "type": "shell",
+      "command": "pnpm",
+      "args": [
+        "run",
+        "build:watch"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "esbuild",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^\\[watch\\] build started$",
+          "endsPattern": "^\\[watch\\] build finished, watching for changes\\.\\.\\.$"
+        }
+      },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "clear": true
+      }
     }
   ]
 }

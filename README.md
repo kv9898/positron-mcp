@@ -52,7 +52,12 @@ Reload Positron after installation.
 
 ## Debug in Positron
 
-Open this repository as a folder in Positron, select **Run and Debug**, choose **Run Positron Extension**, and press F5. The pre-launch task runs `pnpm run build`, then Positron opens an Extension Development Host with this workspace loaded as a development extension. Breakpoints in `src/**/*.ts` map through the generated source map.
+Open this repository as a folder in Positron and use one of these Run and Debug profiles:
+
+- **Run Positron Extension** runs the `pnpm: build` task once before F5 launches the Extension Development Host.
+- **Run Positron Extension (Watch)** starts `pnpm run build:watch`, waits for the initial bundle, and then launches the Extension Development Host. Subsequent source edits rebuild `dist/extension.js` automatically.
+
+Breakpoints in `src/**/*.ts` map through the generated source map. After a watched rebuild, run **Developer: Reload Window** in the Extension Development Host to load the new extension bundle; rebuilding does not hot-replace an already activated extension.
 
 Two additional launch profiles are available for tests:
 

@@ -15,6 +15,19 @@
       "preLaunchTask": "pnpm: build"
     },
     {
+      "name": "Run Positron Extension (Watch)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/dist/**/*.js"
+      ],
+      "sourceMaps": true,
+      "preLaunchTask": "pnpm: watch"
+    },
+    {
       "name": "Debug Current Vitest File",
       "type": "node",
       "request": "launch",

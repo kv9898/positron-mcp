@@ -89,6 +89,7 @@
   },
   "scripts": {
     "build": "node esbuild.mjs",
+    "build:watch": "node esbuild.mjs --watch",
     "check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
