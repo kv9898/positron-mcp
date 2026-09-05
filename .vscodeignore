@@ -1,11 +1,13 @@
 .git/**
+.gitignore
 .github/**
 .agents/**
 .codex/**
 node_modules/**
 src/**
 test/**
-*.map
+**/*.map
 tsconfig.json
 esbuild.mjs
 pnpm-lock.yaml
+pnpm-workspace.yaml
