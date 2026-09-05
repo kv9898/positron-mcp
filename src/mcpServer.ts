@@ -1,5 +1,6 @@
 import type { Server as HttpServer } from 'node:http';
 import { Buffer } from 'node:buffer';
+import type { NextFunction, Request, Response } from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -44,7 +45,7 @@ export class PositronMcpHttpServer {
     if (this.httpServer && this.endpointValue) return this.endpointValue;
 
     const app = createMcpExpressApp({ host: HOST });
-    app.use((request, response, next) => {
+    app.use((request: Request, response: Response, next: NextFunction) => {
       const origin = request.header('origin');
       if (origin && !isLoopbackOrigin(origin)) {
         response.status(403).json({ error: 'Remote origins are not permitted.' });
@@ -53,7 +54,7 @@ export class PositronMcpHttpServer {
       next();
     });
 
-    app.post(PATH, async (request, response) => {
+    app.post(PATH, async (request: Request, response: Response) => {
       const connection: ActiveConnection = {
         server: createToolServer(this.runtime),
         transport: new StreamableHTTPServerTransport({ sessionIdGenerator: undefined }),
@@ -80,8 +81,8 @@ export class PositronMcpHttpServer {
       }
     });
 
-    app.get(PATH, (_request, response) => methodNotAllowed(response));
-    app.delete(PATH, (_request, response) => methodNotAllowed(response));
+    app.get(PATH, (_request: Request, response: Response) => methodNotAllowed(response));
+    app.delete(PATH, (_request: Request, response: Response) => methodNotAllowed(response));
 
     const server = await new Promise<HttpServer>((resolve, reject) => {
       const candidate = app.listen(this.options.port, HOST);

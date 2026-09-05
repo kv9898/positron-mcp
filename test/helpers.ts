@@ -68,7 +68,7 @@ export function createMockApi(options: MockApiOptions = {}): PositronApi {
     RuntimeErrorBehavior: { Stop: 'stop', Continue: 'continue' },
     runtime: {
       getForegroundSession: async () => options.active === false ? undefined : session,
-      getSessionVariables: async (_sessionId, accessKeys) => {
+      getSessionVariables: async (_sessionId: string, accessKeys?: string[][]) => {
         const variables = options.variables ?? [[]];
         return accessKeys ? variables.slice(1) : variables.slice(0, 1);
       },
@@ -79,7 +79,7 @@ export function createMockApi(options: MockApiOptions = {}): PositronApi {
 
 export function createCancellationSource(): CancellationSourceLike {
   let cancelled = false;
-  const listeners = new Set<() => void>();
+  const listeners = new Set<(event: void) => unknown>();
   return {
     token: {
       get isCancellationRequested() { return cancelled; },
@@ -90,7 +90,7 @@ export function createCancellationSource(): CancellationSourceLike {
     } as vscode.CancellationToken,
     cancel: () => {
       cancelled = true;
-      for (const listener of listeners) listener();
+      for (const listener of listeners) listener(undefined);
     },
     dispose: () => listeners.clear(),
   };
