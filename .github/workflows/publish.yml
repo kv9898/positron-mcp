@@ -76,10 +76,18 @@ jobs:
 
   release:
     name: Create GitHub release
-    needs: package
+    needs:
+      - package
+      - publish_open_vsx
     runs-on: ubuntu-latest
 
     steps:
+      - name: Check out the release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+
       - name: Download VSIX artifact
         uses: actions/download-artifact@v4
         with:
@@ -94,3 +102,21 @@ jobs:
           --verify-tag
           --title "Positron Codex MCP ${{ needs.package.outputs.version }}"
           --generate-notes
+
+  publish_open_vsx:
+    name: Publish to Open VSX
+    needs: package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download VSIX artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: extension-vsix
+          path: open-vsx-assets
+
+      - name: Publish VSIX to Open VSX
+        uses: HaaLeo/publish-vscode-extension@v2
+        with:
+          pat: ${{ secrets.OPEN_VSX_TOKEN }}
+          extensionFile: open-vsx-assets/positron-codex-mcp-${{ needs.package.outputs.version }}.vsix
