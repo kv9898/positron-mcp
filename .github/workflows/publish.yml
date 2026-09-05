@@ -53,7 +53,7 @@ jobs:
         id: release_metadata
         shell: bash
         run: |
-          version="$(node --input-type=module --eval \"import manifest from './package.json' with { type: 'json' }; process.stdout.write(manifest.version)\")"
+          version="$(node --print "require('./package.json').version")"
           test "$RELEASE_TAG" = "v$version"
           grep --fixed-strings --quiet "## [$version]" CHANGELOG.md
           echo "version=$version" >> "$GITHUB_OUTPUT"
