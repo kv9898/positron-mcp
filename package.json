@@ -3,7 +3,7 @@
   "displayName": "Positron Codex MCP",
   "description": "Expose the foreground Positron R or Python session to trusted local MCP clients.",
   "version": "0.0.3",
-  "publisher": "local",
+  "publisher": "kv9898",
   "author": {
     "name": "Dianyi Yang",
     "email": "dianyi.yang@politics.ox.ac.uk"
