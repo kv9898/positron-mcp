@@ -4,8 +4,20 @@
   "description": "Expose the foreground Positron R or Python session to trusted local MCP clients.",
   "version": "0.0.2",
   "publisher": "local",
+  "author": {
+    "name": "Dianyi Yang",
+    "email": "dianyi.yang@politics.ox.ac.uk"
+  },
   "license": "MIT",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kv9898/positron-mcp.git"
+  },
+  "homepage": "https://github.com/kv9898/positron-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/kv9898/positron-mcp/issues"
+  },
   "engines": {
     "vscode": "^1.103.0",
     "positron": "^2026.09.1"
@@ -98,7 +110,7 @@
     "check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "package": "pnpm run build && vsce package --no-dependencies --allow-missing-repository"
+    "package": "pnpm run build && vsce package --no-dependencies"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",
