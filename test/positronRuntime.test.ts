@@ -48,6 +48,71 @@ describe('PositronRuntimeAdapter', () => {
     });
   });
 
+  it('returns bounded native table summaries for exact foreground-session variables', async () => {
+    const df: RuntimeVariable = {
+      access_key: 'df-key', display_name: 'df', display_type: 'data.frame',
+      display_value: '10 rows x 2 columns', length: 2, size: 1024, has_children: true,
+    };
+    const tableSummaries = vi.fn(async (..._args: Parameters<PositronApi['runtime']['querySessionTables']>) => [{
+      num_rows: 10,
+      num_columns: 2,
+      column_schemas: ['species: string', 'value: number'],
+      column_profiles: ['3 distinct values', 'min=1, max=20'],
+    }]);
+    const result = await adapter(createMockApi({ variables: [[df]], tableSummaries }))
+      .getTableSummaries(['df']);
+
+    expect(result).toMatchObject({
+      session_id: 'r-session-1',
+      language: 'r',
+      tables: [{ name: 'df', access_key: 'df-key', num_rows: 10, num_columns: 2 }],
+      truncated: false,
+    });
+    expect(tableSummaries).toHaveBeenCalledWith('r-session-1', [['df-key']], ['summary']);
+  });
+
+  it('bounds table-summary text at the configured output cap', async () => {
+    const df: RuntimeVariable = {
+      access_key: 'df', display_name: 'df', display_type: 'data.frame',
+      display_value: '', length: 1, size: 1, has_children: true,
+    };
+    const result = await adapter(createMockApi({
+      variables: [[df]],
+      tableSummaries: async () => [{
+        num_rows: 1, num_columns: 1, column_schemas: ['abcdefghijklmnop'], column_profiles: ['profile'],
+      }],
+    }), 1000, 10).getTableSummaries(['df']);
+    expect(result).toMatchObject({
+      tables: [{ column_schemas: ['abcdefghij'], column_profiles: [] }],
+      truncated: true,
+    });
+  });
+
+  it('returns bounded recent history from the exact foreground session', async () => {
+    const consoleHistory = vi.fn(async (..._args: Parameters<PositronApi['runtime']['getConsoleHistory']>) => [{
+      input: 'x <- 1', output: '[1] 1', when: 123, error: undefined,
+    }]);
+    const result = await adapter(createMockApi({ consoleHistory })).getConsoleHistory(7);
+    expect(result).toMatchObject({
+      session_id: 'r-session-1', language: 'r',
+      entries: [{ input: 'x <- 1', output: '[1] 1', when: 123 }], truncated: false,
+    });
+    expect(consoleHistory).toHaveBeenCalledWith('r-session-1', 7);
+  });
+
+  it('bounds console-history content and reports the history privacy setting', async () => {
+    const bounded = await adapter(createMockApi({
+      consoleHistory: async () => [{ input: 'abcdefghijklmnop', output: 'output', when: 123 }],
+    }), 1000, 10).getConsoleHistory();
+    expect(bounded).toMatchObject({ entries: [{ input: 'abcdefghij', output: '' }], truncated: true });
+
+    await expect(adapter(createMockApi({
+      consoleHistory: async () => { throw new Error('console.historyApiEnabled is disabled'); },
+    })).getConsoleHistory()).rejects.toMatchObject({
+      name: 'CONSOLE_HISTORY_DISABLED', code: 'CONSOLE_HISTORY_DISABLED',
+    });
+  });
+
   it('silently evaluates code and returns its scalar result and combined output', async () => {
     const evaluate = vi.fn(async (..._args: Parameters<PositronApi['runtime']['evaluateCode']>) => ({
       result: 3,

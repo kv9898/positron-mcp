@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Placeholder for upcoming changes.
+- Added `positron_table_summary` for bounded native metadata and profiles of existing foreground-session tables and data frames.
+- Added `positron_console_history` for bounded recent console context, respecting Positron's console-history privacy setting.
 
 ## [0.1.0] - 2026-09-05
 
@@ -23,4 +24,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Restricted the MCP listener to IPv4 loopback and rejected non-loopback browser origins.
 - Kept tool inputs, executed code, runtime values, and credentials out of lifecycle logs.
-

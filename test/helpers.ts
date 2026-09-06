@@ -4,6 +4,8 @@ import type { CancellationSourceLike } from '../src/positronRuntime';
 
 type ExecuteImplementation = PositronApi['runtime']['executeCode'];
 type EvaluateImplementation = PositronApi['runtime']['evaluateCode'];
+type TableSummaryImplementation = PositronApi['runtime']['querySessionTables'];
+type ConsoleHistoryImplementation = PositronApi['runtime']['getConsoleHistory'];
 
 export interface MockApiOptions {
   language?: 'r' | 'python';
@@ -11,6 +13,8 @@ export interface MockApiOptions {
   variables?: RuntimeVariable[][];
   execute?: ExecuteImplementation;
   evaluate?: EvaluateImplementation;
+  tableSummaries?: TableSummaryImplementation;
+  consoleHistory?: ConsoleHistoryImplementation;
   state?: string;
 }
 
@@ -60,6 +64,8 @@ export function createMockApi(options: MockApiOptions = {}): PositronApi {
     result: 42,
     output: '',
   }));
+  const tableSummaries: TableSummaryImplementation = options.tableSummaries ?? (async () => []);
+  const consoleHistory: ConsoleHistoryImplementation = options.consoleHistory ?? (async () => []);
 
   return {
     version: '2026.10.0',
@@ -81,6 +87,8 @@ export function createMockApi(options: MockApiOptions = {}): PositronApi {
       },
       evaluateCode: evaluate,
       executeCode: execute,
+      querySessionTables: tableSummaries,
+      getConsoleHistory: consoleHistory,
     },
   } as unknown as PositronApi;
 }

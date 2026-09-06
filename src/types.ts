@@ -47,6 +47,40 @@ export interface VariablesResult {
   truncated: boolean;
 }
 
+export interface TableSummary {
+  name: string;
+  access_key: string;
+  num_rows: number;
+  num_columns: number;
+  column_schemas: string[];
+  column_profiles: string[];
+}
+
+export interface TableSummariesResult {
+  session_id: string;
+  language: string;
+  tables: TableSummary[];
+  truncated: boolean;
+}
+
+export interface ConsoleHistoryEntry {
+  input: string;
+  output: string;
+  when: number;
+  error?: {
+    name: string;
+    message: string;
+    traceback: string[];
+  };
+}
+
+export interface ConsoleHistoryResult {
+  session_id: string;
+  language: string;
+  entries: ConsoleHistoryEntry[];
+  truncated: boolean;
+}
+
 export type ExecutionStatus = 'success' | 'error' | 'interrupted' | 'timed_out' | 'unsupported_result';
 
 export interface EvaluationResult {
@@ -95,6 +129,8 @@ export interface ExecutionResult {
 export interface RuntimeAdapter {
   getSession(): Promise<SessionInfo>;
   getVariables(options?: { name?: string; maxVariables?: number }): Promise<VariablesResult>;
+  getTableSummaries(names: string[]): Promise<TableSummariesResult>;
+  getConsoleHistory(maxEntries?: number): Promise<ConsoleHistoryResult>;
   evaluate(code: string, timeoutMs?: number): Promise<EvaluationResult>;
   execute(code: string, timeoutMs?: number): Promise<ExecutionResult>;
 }

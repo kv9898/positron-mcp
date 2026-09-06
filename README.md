@@ -2,10 +2,12 @@
 
 This standalone TypeScript extension exposes the **existing foreground Positron R or Python session** to a trusted local MCP client such as Codex. It does not spawn R or Python, proxy OpenAI requests, or handle OpenAI credentials.
 
-The extension provides four tools:
+The extension provides six tools:
 
 - `positron_session` — foreground session/runtime metadata.
 - `positron_variables` — bounded variable metadata, optionally including one object's immediate children.
+- `positron_table_summary` — bounded native table/data-frame metadata and column profiles.
+- `positron_console_history` — bounded recent completed console entries, subject to Positron's history privacy setting.
 - `positron_evaluate` — silent, result-returning calculation and inspection in that exact foreground session.
 - `positron_execute` — visible, history-recorded state-changing execution, with best-effort output and static plot attachments where Positron emits them.
 
@@ -93,7 +95,7 @@ The MCP server supplies usage instructions during initialization and gives each 
 
 For example, if `a` and `b` exist only in the Positron Console, a request such as “calculate `a + b`” should lead Codex to discover the live variables and evaluate the expression through this MCP server. Explicitly saying “use Positron” remains a useful override because tool selection is ultimately decided by the MCP client and model.
 
-The server directs calculations, summaries, comparisons, and inspection to `positron_evaluate`. It directs assignments, mutation, package loading, option or working-directory changes, random-number generation, plots, file operations, and other side effects to `positron_execute`. If transparent execution returns no result, Codex is told to verify the state through `positron_variables` or a separate evaluation rather than repeating the mutation.
+The server directs native table/data-frame orientation to `positron_table_summary`, and calculations, language-specific summaries, comparisons, and other inspection to `positron_evaluate`. It directs assignments, mutation, package loading, option or working-directory changes, random-number generation, plots, file operations, and other side effects to `positron_execute`. `positron_console_history` is reserved for requests that need recent console context because it can contain sensitive content. If transparent execution returns no result, Codex is told to verify the state through `positron_variables` or a separate evaluation rather than repeating the mutation.
 
 A separate Codex skill is not required. A skill or project `AGENTS.md` can reinforce this behavior, but it must be installed or added to each relevant project, whereas the MCP instructions and tool descriptions travel with this server automatically.
 
@@ -147,7 +149,7 @@ Then ask Codex:
 
 > Inspect my current live interpreter. Tell me what variables exist, inspect `df`, then run an appropriate summary and explain anything unusual.
 
-`positron_variables` should see the manually created identity object. `positron_evaluate` can summarize `df` without displaying code in the console. `positron_execute` can then mutate the identity object or create another object; this code is displayed and added to console history. Because the adapter passes the already acquired foreground `session_id` to both runtime APIs, seeing the mutation from both MCP and Console demonstrates that no subprocess was used.
+`positron_variables` should see the manually created identity object. `positron_table_summary` can inspect `df` without evaluating code, while `positron_evaluate` can run language-specific calculations without displaying code in the console. `positron_execute` can then mutate the identity object or create another object; this code is displayed and added to console history. Because the adapter passes the already acquired foreground `session_id` to every runtime API, seeing the mutation from both MCP and Console demonstrates that no subprocess was used.
 
 ## Tool behavior
 
@@ -164,6 +166,22 @@ Optional arguments:
 ```
 
 Without `name`, it lists root variables. With `name`, it returns that variable and at most one level of children. Display values are capped at 2,000 characters and counts are capped, so this is metadata inspection rather than an object dump.
+
+### `positron_table_summary`
+
+```json
+{ "names": ["df"] }
+```
+
+Returns Positron's native summary for existing data frames or tables in the foreground session: row and column counts, column schemas, and column profiles. Names may be displayed variable names or Positron access keys. First use `positron_variables` to find the relevant object. The result is bounded by the configured output cap and does not evaluate code or change the session.
+
+### `positron_console_history`
+
+```json
+{ "max_entries": 5 }
+```
+
+Returns the requested number of most recent completed console executions, oldest first, with their code, output, errors, and timestamps. This is read-only but may reveal sensitive runtime content, so use it only when the recent console context is needed. It respects Positron's `console.historyApiEnabled` privacy setting and returns `CONSOLE_HISTORY_DISABLED` when that setting is off. Text is bounded by the configured output cap.
 
 ### `positron_evaluate`
 
@@ -214,10 +232,8 @@ Other processes running as your local user can generally reach localhost. Stop t
 
 ## Why Positron core changes are not required
 
-The published public API exposes every operation needed by this extension: `getForegroundSession()`, `getSessionVariables(sessionId, ...)`, `evaluateCode(..., sessionId, ...)`, and `executeCode(..., observer, sessionId, ...)`. Passing the foreground session ID prevents the documented fallback that may select or start a different session. The extension hosts its own small localhost MCP transport, so Positron core does not need a new server or authentication path.
+The published public API exposes every operation needed by this extension: `getForegroundSession()`, `getSessionVariables(sessionId, ...)`, `querySessionTables(sessionId, ...)`, `getConsoleHistory(sessionId, ...)`, `evaluateCode(..., sessionId, ...)`, and `executeCode(..., observer, sessionId, ...)`. Passing the foreground session ID prevents the documented fallback that may select or start a different session. The extension hosts its own small localhost MCP transport, so Positron core does not need a new server or authentication path.
 
 ## Remaining gaps vs Posit Assistant
 
-This extension deliberately does not reproduce Posit Assistant. It lacks automatic dataframe profiling, deep table queries, console-history tooling, current Plots-pane introspection, dynamic-widget capture, notebook/editor context, package/module context, UI state, prompt orchestration, and Assistant authentication. The current public API does expose session table queries and privacy-gated console history; they are not part of the current four-tool interface.
-
-See `TECHNICAL_ASSESSMENT.md` for the API and feasibility investigation.
+This extension deliberately does not reproduce Posit Assistant. It lacks automatic dataframe profiling, deep table queries, console-history search, current Plots-pane introspection, dynamic-widget capture, notebook/editor context, package/module context, UI state, prompt orchestration, and Assistant authentication. It provides bounded native table summaries and privacy-gated recent console history, rather than the broader Assistant experience.
