@@ -88,7 +88,7 @@ The Output panel's **Positron Codex MCP** channel also shows the endpoint. It lo
 
 `positronCodexMcp.port` defaults to the stable loopback port `37821`. This keeps the MCP URL unchanged across Positron restarts, so Codex only needs to be configured once. Change it through the `positronCodexMcp.port` user setting in Positron Settings. Port `0` remains available as an explicit opt-in to automatic, non-stable port selection.
 
-On first installation, the extension displays a non-blocking notification offering both the Codex MCP setup commands and an install command for the included `positron-live-runtime` skill. The extension never changes Codex configuration itself: run the copied command, then reload the Codex host so it discovers the skill. It also displays an update notification whenever the configured port changes, including changes made directly in Positron Settings. The update action can restart the server and copy replacement Codex commands in one step.
+On first installation, the extension displays a non-blocking notification offering both the Codex MCP setup commands and an install command for the included `positron` skill. The extension never changes Codex configuration itself: run the copied command, then reload the Codex host so it discovers the skill. It also displays an update notification whenever the configured port changes, including changes made directly in Positron Settings. The update action can restart the server and copy replacement Codex commands in one step.
 
 ## Helping Codex choose the Positron tools
 
@@ -98,7 +98,7 @@ For example, if `a` and `b` exist only in the Positron Console, a request such a
 
 The server directs native table/data-frame orientation to `positron_table_summary`, and calculations, language-specific summaries, comparisons, and other inspection to `positron_evaluate`. It directs assignments, mutation, package loading, option or working-directory changes, random-number generation, plots, file operations, and other side effects to `positron_execute`. `positron_console_history` is reserved for requests that need recent console context because it can contain sensitive content. If transparent execution returns no result, Codex is told to verify the state through `positron_variables` or a separate evaluation rather than repeating the mutation.
 
-The included `positron-live-runtime` skill reinforces this behavior when installed in Codex. It is intentionally short and describes only the decisions that MCP tool metadata alone does not reliably trigger. The skill uses the portable `SKILL.md` format, so other agents that support that format can reuse it, but the one-click discovery/install prompt currently targets Codex.
+The included `positron` skill reinforces this behavior when installed in Codex. It directs the agent to treat unseen live R/Python state as session information to inspect before using a terminal or asking the user. The skill uses the portable `SKILL.md` format, so other agents that support that format can reuse it, but the one-click discovery/install prompt currently targets Codex.
 
 ## Configure Codex
 
@@ -129,7 +129,9 @@ Then reload the Positron window. No OpenAI API key is needed by this extension; 
 
 ### Install the included Codex skill
 
-Run **Positron Codex: Copy Codex Skill Install Command**, then run the copied command in your shell and reload the Codex host. This copies the bundled `skills/positron-live-runtime` folder into Codex's skills directory without the extension editing Codex configuration itself. Once installed, Codex can select it automatically when a request may depend on the live Positron session; you can also explicitly invoke it with `$positron-live-runtime`.
+Run **Positron Codex: Copy Codex Skill Install Command**, then run the copied command in your shell and reload the Codex host. This copies the bundled `skills/positron` folder into Codex's skills directory without the extension editing Codex configuration itself. Once installed, Codex can select it automatically when a request may depend on the live Positron session; you can also explicitly invoke it with `$positron`.
+
+The explicit skill shorthand is `$positron`. The extension cannot register a literal `/pos` chat command in Codex; slash commands are owned by the Codex host.
 
 The `SKILL.md` file is portable to other agents that support the Agent Skills format, but their skill-directory locations and reload behavior vary. The extension only provides an automated install command for Codex.
 

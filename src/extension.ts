@@ -47,11 +47,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const skillPath = vscode.Uri.joinPath(
       context.extensionUri,
       'skills',
-      'positron-live-runtime',
+      'positron',
     ).fsPath;
     await vscode.env.clipboard.writeText(codexSkillInstallCommand(skillPath));
     void vscode.window.showInformationMessage(
-      'Codex skill-install command copied. Run it, then reload the Codex host so it discovers the Positron live-runtime skill.',
+      'Codex skill-install command copied. Run it, then reload the Codex host so it discovers the Positron skill.',
     );
   };
 
