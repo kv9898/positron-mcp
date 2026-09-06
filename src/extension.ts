@@ -158,7 +158,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('positronCodexMcp.copyCodexSetup', () => copyCodexSetup()),
     vscode.commands.registerCommand('positronCodexMcp.copyCodexSkillInstall', copyCodexSkillInstall),
     vscode.commands.registerCommand('positronCodexMcp.showDiagnostics', async () => {
-      output!.appendLine(`[Diagnostics] extension=0.1.0 positron=${api?.version ?? 'unavailable'} build=${api?.buildNumber ?? 'unavailable'} endpoint=${server?.endpoint ?? 'stopped'}`);
+      output!.appendLine(`[Diagnostics] extension=0.2.0 positron=${api?.version ?? 'unavailable'} build=${api?.buildNumber ?? 'unavailable'} endpoint=${server?.endpoint ?? 'stopped'}`);
       if (api) {
         const foreground = await api.runtime.getForegroundSession();
         output!.appendLine(`[Diagnostics] foreground_session=${foreground?.metadata.sessionId ?? 'none'} language=${foreground?.runtimeMetadata.languageId ?? 'none'} state=${foreground?.getRuntimeState?.() ?? 'unknown'}`);
