@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added `positron_table_summary` for bounded native metadata and profiles of existing foreground-session tables and data frames.
 - Added `positron_console_history` for bounded recent console context, respecting Positron's console-history privacy setting.
+- Added the bundled `positron` Codex skill and non-blocking onboarding action that copies its manual install command.
 
 ## [0.1.0] - 2026-09-05
 

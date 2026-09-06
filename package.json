@@ -68,6 +68,10 @@
         "title": "Positron Codex: Copy Codex MCP Setup Commands"
       },
       {
+        "command": "positronCodexMcp.copyCodexSkillInstall",
+        "title": "Positron Codex: Copy Codex Skill Install Command"
+      },
+      {
         "command": "positronCodexMcp.showDiagnostics",
         "title": "Positron Codex: Show Diagnostics"
       }

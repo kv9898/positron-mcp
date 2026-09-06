@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
 import { tryAcquirePositronApi } from '@posit-dev/positron';
-import { codexSetupCommands, endpointForFixedPort } from './codexSetup';
+import { codexSetupCommands, codexSkillInstallCommand, endpointForFixedPort } from './codexSetup';
 import { PositronMcpHttpServer } from './mcpServer';
 import { PositronRuntimeAdapter } from './positronRuntime';
 
-const CODEX_SETUP_NOTICE_KEY = 'positronCodexMcp.hasShownCodexSetupV1';
+const CODEX_ONBOARDING_NOTICE_KEY = 'positronCodexMcp.hasShownCodexOnboardingV2';
 
 let server: PositronMcpHttpServer | undefined;
 let output: vscode.OutputChannel | undefined;
@@ -43,13 +43,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
   };
 
+  const copyCodexSkillInstall = async () => {
+    const skillPath = vscode.Uri.joinPath(
+      context.extensionUri,
+      'skills',
+      'positron',
+    ).fsPath;
+    await vscode.env.clipboard.writeText(codexSkillInstallCommand(skillPath));
+    void vscode.window.showInformationMessage(
+      'Codex skill-install command copied. Run it, then reload the Codex host so it discovers the Positron skill.',
+    );
+  };
+
   const notifyCodexSetup = async (message: string, endpoint?: string) => {
     const action = await vscode.window.showInformationMessage(
       message,
       'Copy Codex Setup',
+      'Copy Skill Install',
       'Show Instructions',
     );
     if (action === 'Copy Codex Setup') await copyCodexSetup(endpoint);
+    if (action === 'Copy Skill Install') await copyCodexSkillInstall();
     if (action === 'Show Instructions') {
       const upperCaseReadme = vscode.Uri.joinPath(context.extensionUri, 'README.md');
       const lowerCaseReadme = vscode.Uri.joinPath(context.extensionUri, 'readme.md');
@@ -95,10 +109,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       output!.appendLine('[Security] This endpoint can execute arbitrary code in the foreground live interpreter.');
       output!.appendLine('[Security] Bound to IPv4 loopback only; no secrets are logged.');
 
-      if (!context.globalState.get<boolean>(CODEX_SETUP_NOTICE_KEY, false)) {
-        await context.globalState.update(CODEX_SETUP_NOTICE_KEY, true);
+      if (!context.globalState.get<boolean>(CODEX_ONBOARDING_NOTICE_KEY, false)) {
+        await context.globalState.update(CODEX_ONBOARDING_NOTICE_KEY, true);
         void notifyCodexSetup(
-          `Positron Codex MCP is installed and listening at ${endpoint}. Connect Codex to use your Positron session tools.`,
+          `Positron Codex MCP is listening at ${endpoint}. Connect Codex, then install the included skill so Codex reliably recognizes when to use your live Positron tools.`,
           endpoint,
         );
       }
@@ -142,6 +156,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       void vscode.window.showInformationMessage('Positron MCP endpoint copied.');
     }),
     vscode.commands.registerCommand('positronCodexMcp.copyCodexSetup', () => copyCodexSetup()),
+    vscode.commands.registerCommand('positronCodexMcp.copyCodexSkillInstall', copyCodexSkillInstall),
     vscode.commands.registerCommand('positronCodexMcp.showDiagnostics', async () => {
       output!.appendLine(`[Diagnostics] extension=0.1.0 positron=${api?.version ?? 'unavailable'} build=${api?.buildNumber ?? 'unavailable'} endpoint=${server?.endpoint ?? 'stopped'}`);
       if (api) {
