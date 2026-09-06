@@ -9,6 +9,8 @@ import { evaluateTool } from './tools/evaluate';
 import { executeTool } from './tools/execute';
 import { sessionTool } from './tools/session';
 import { variablesTool } from './tools/variables';
+import { tableSummaryTool } from './tools/tableSummary';
+import { consoleHistoryTool } from './tools/consoleHistory';
 import type { EvaluationResult, ExecutionResult, RuntimeAdapter } from './types';
 
 const HOST = '127.0.0.1';
@@ -18,6 +20,8 @@ const SERVER_INSTRUCTIONS = [
   'Also use them when a requested calculation or analysis may depend on values defined in that session but not included in the prompt or repository files.',
   'Do not ask the user to provide those values before checking Positron.',
   'First call positron_session, then use positron_variables to discover or inspect relevant objects.',
+  'Use positron_table_summary for bounded native metadata and profiles of one or more live data frames or tables.',
+  'Use positron_console_history only when recent code, output, or errors from the foreground console are needed; it can expose sensitive content and is disabled when the user has turned off Positron console-history access.',
   'Use positron_evaluate for calculations, summaries, comparisons, and other inspection that is not intended to change interpreter or external state.',
   'For example, a request to calculate a + b should inspect a and b in Positron and evaluate the expression with positron_evaluate.',
   'Never claim that no live interpreter exists unless positron_session returns NO_ACTIVE_RUNTIME.',
@@ -164,6 +168,32 @@ export function createToolServer(runtime: RuntimeAdapter): McpServer {
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async input => toolResponse(() => variablesTool(runtime, input)),
+  );
+
+  server.registerTool(
+    'positron_table_summary',
+    {
+      title: 'Positron live table summaries',
+      description: 'Return bounded native Positron summary metadata for one or more existing foreground-session tables or data frames: row and column counts, column schemas, and column profiles. Use after positron_variables identifies the relevant object. This tool never evaluates code or changes the session.',
+      inputSchema: {
+        names: z.array(z.string().min(1)).min(1).max(25).describe('Display names or Positron access keys of existing table or data-frame variables.'),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async input => toolResponse(() => tableSummaryTool(runtime, input)),
+  );
+
+  server.registerTool(
+    'positron_console_history',
+    {
+      title: 'Recent Positron console history',
+      description: 'Return a bounded number of completed foreground-console executions, including code, output, errors, and timestamps. Use only when recent console context is necessary because history can contain sensitive runtime content. This tool is read-only and returns CONSOLE_HISTORY_DISABLED if the user has disabled Positron console-history access.',
+      inputSchema: {
+        max_entries: z.number().int().min(1).max(100).optional().describe('Maximum number of recent completed console entries to return; default 5.'),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async input => toolResponse(() => consoleHistoryTool(runtime, input)),
   );
 
   server.registerTool(

@@ -13,6 +13,8 @@ const runtime: RuntimeAdapter = {
     session_id: 'session-1', session_name: 'R Console', session_mode: 'console', state: 'idle',
   }),
   getVariables: async () => ({ session_id: 'session-1', language: 'r', variables: [], truncated: false }),
+  getTableSummaries: async () => ({ session_id: 'session-1', language: 'r', tables: [], truncated: false }),
+  getConsoleHistory: async () => ({ session_id: 'session-1', language: 'r', entries: [], truncated: false }),
   evaluate: async () => ({
     success: true, status: 'success', session_id: 'session-1', language: 'r', mode: 'silent',
     output: '', result: 3, output_truncated: false, elapsed_ms: 1,
@@ -67,12 +69,17 @@ describe('PositronMcpHttpServer', () => {
       expect(client.getInstructions()).toContain('do not repeat a state-changing call');
       const tools = await client.listTools();
       expect(tools.tools.map(tool => tool.name)).toEqual([
-        'positron_session', 'positron_variables', 'positron_evaluate', 'positron_execute',
+        'positron_session', 'positron_variables', 'positron_table_summary', 'positron_console_history',
+        'positron_evaluate', 'positron_execute',
       ]);
       expect(tools.tools.find(tool => tool.name === 'positron_session')?.description)
         .toContain('Never infer that no interpreter exists without calling this tool.');
       expect(tools.tools.find(tool => tool.name === 'positron_variables')?.description)
         .toContain('instead of asking the user for values');
+      expect(tools.tools.find(tool => tool.name === 'positron_table_summary')?.description)
+        .toContain('row and column counts, column schemas, and column profiles');
+      expect(tools.tools.find(tool => tool.name === 'positron_console_history')?.description)
+        .toContain('CONSOLE_HISTORY_DISABLED');
       expect(tools.tools.find(tool => tool.name === 'positron_evaluate')?.description)
         .toContain('such as a + b');
       expect(tools.tools.find(tool => tool.name === 'positron_evaluate')?.inputSchema.properties)
@@ -84,6 +91,14 @@ describe('PositronMcpHttpServer', () => {
 
       const sessionResult = await client.callTool({ name: 'positron_session', arguments: {} });
       expect(sessionResult.isError).not.toBe(true);
+      const tableSummaryResult = await client.callTool({
+        name: 'positron_table_summary', arguments: { names: ['df'] },
+      });
+      expect(tableSummaryResult.isError).not.toBe(true);
+      const consoleHistoryResult = await client.callTool({
+        name: 'positron_console_history', arguments: { max_entries: 5 },
+      });
+      expect(consoleHistoryResult.isError).not.toBe(true);
       const evaluationResult = await client.callTool({
         name: 'positron_evaluate', arguments: { code: 'a + b' },
       });

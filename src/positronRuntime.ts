@@ -7,9 +7,13 @@ import type {
 import {
   type EvaluationResult,
   type ExecutionResult,
+  type ConsoleHistoryEntry,
+  type ConsoleHistoryResult,
   NoActiveRuntimeError,
   type RuntimeAdapter,
   type SessionInfo,
+  type TableSummariesResult,
+  type TableSummary,
   type VariableInfo,
   type VariablesResult,
 } from './types';
@@ -29,6 +33,8 @@ export interface RuntimeAdapterOptions {
 }
 
 const DEFAULT_MAX_VARIABLES = 200;
+const DEFAULT_HISTORY_ENTRIES = 5;
+const MAX_HISTORY_ENTRIES = 100;
 
 export class PositronRuntimeAdapter implements RuntimeAdapter {
   constructor(
@@ -101,6 +107,66 @@ export class PositronRuntimeAdapter implements RuntimeAdapter {
       requested_name: options.name,
       variables,
       truncated,
+    };
+  }
+
+  async getTableSummaries(names: string[]): Promise<TableSummariesResult> {
+    const session = await this.requireForegroundSession();
+    const rootGroups = await this.api.runtime.getSessionVariables(session.metadata.sessionId);
+    const roots = rootGroups.flat();
+    const tables = names.map(name => {
+      const variable = roots.find(candidate =>
+        candidate.display_name === name || candidate.access_key === name,
+      );
+      if (!variable) {
+        throw namedError(
+          'VARIABLE_NOT_FOUND',
+          `Variable '${name}' was not found in the foreground ${session.runtimeMetadata.languageName} session.`,
+        );
+      }
+      return variable;
+    });
+    const summaries = await this.api.runtime.querySessionTables(
+      session.metadata.sessionId,
+      tables.map(table => [table.access_key]),
+      ['summary'],
+    );
+    const limited = limitTableSummaries(tables, summaries, this.options.maxOutputCharacters);
+
+    return {
+      session_id: session.metadata.sessionId,
+      language: session.runtimeMetadata.languageId,
+      tables: limited.tables,
+      truncated: limited.truncated,
+    };
+  }
+
+  async getConsoleHistory(maxEntries = DEFAULT_HISTORY_ENTRIES): Promise<ConsoleHistoryResult> {
+    const session = await this.requireForegroundSession();
+    let entries;
+    try {
+      entries = await this.api.runtime.getConsoleHistory(
+        session.metadata.sessionId,
+        clampInteger(maxEntries, 1, MAX_HISTORY_ENTRIES),
+      );
+    } catch (error) {
+      const normalized = normalizeError(error);
+      if (/historyApiEnabled|console history.*disabled|history.*disabled/i.test(
+        `${normalized.name} ${normalized.message}`,
+      )) {
+        throw codedError(
+          'CONSOLE_HISTORY_DISABLED',
+          'Positron console-history access is disabled by the user. Enable console.historyApiEnabled to use this tool.',
+        );
+      }
+      throw error;
+    }
+    const limited = limitConsoleHistory(entries, this.options.maxOutputCharacters);
+    return {
+      session_id: session.metadata.sessionId,
+      language: session.runtimeMetadata.languageId,
+      entries: limited.entries,
+      truncated: limited.truncated,
     };
   }
 
@@ -374,6 +440,13 @@ function namedError(name: string, message: string): Error {
   return error;
 }
 
+function codedError(code: string, message: string): Error & { code: string } {
+  const error = new Error(message) as Error & { code: string };
+  error.name = code;
+  error.code = code;
+  return error;
+}
+
 function normalizeError(error: unknown): Error {
   if (error instanceof Error) return error;
   return new Error(typeof error === 'string' ? error : JSON.stringify(error));
@@ -413,6 +486,70 @@ function limitJson(
       preview: serialized.slice(0, maximum),
     },
     truncated: true,
+  };
+}
+
+function limitTableSummaries(
+  variables: RuntimeVariable[],
+  summaries: Array<{ num_rows: number; num_columns: number; column_schemas: string[]; column_profiles: string[] }>,
+  maximum: number,
+): { tables: TableSummary[]; truncated: boolean } {
+  let remaining = maximum;
+  let truncated = false;
+  const limitValues = (values: string[]) => {
+    const result: string[] = [];
+    for (const value of values) {
+      if (remaining <= 0) {
+        truncated = true;
+        break;
+      }
+      const limited = limitText(value, remaining);
+      result.push(limited.value);
+      remaining -= limited.value.length;
+      truncated ||= limited.truncated;
+      if (limited.truncated) break;
+    }
+    if (result.length < values.length) truncated = true;
+    return result;
+  };
+  if (summaries.length !== variables.length) truncated = true;
+  const tables = summaries.map((summary, index) => ({
+    name: variables[index]?.display_name ?? variables[index]?.access_key ?? `table_${index + 1}`,
+    access_key: variables[index]?.access_key ?? '',
+    num_rows: summary.num_rows,
+    num_columns: summary.num_columns,
+    column_schemas: limitValues(summary.column_schemas),
+    column_profiles: limitValues(summary.column_profiles),
+  }));
+  return { tables, truncated };
+}
+
+function limitConsoleHistory(
+  entries: Array<{ input: string; output: string; when: number; error?: { name: string; message: string; traceback: string[] } }>,
+  maximum: number,
+): { entries: ConsoleHistoryEntry[]; truncated: boolean } {
+  let remaining = maximum;
+  let truncated = false;
+  const limit = (value: string) => {
+    const limited = limitText(value, Math.max(remaining, 0));
+    remaining -= limited.value.length;
+    truncated ||= limited.truncated;
+    return limited.value;
+  };
+  return {
+    entries: entries.map(entry => ({
+      input: limit(entry.input),
+      output: limit(entry.output),
+      when: entry.when,
+      ...(entry.error && {
+        error: {
+          name: limit(entry.error.name),
+          message: limit(entry.error.message),
+          traceback: entry.error.traceback.map(limit),
+        },
+      }),
+    })),
+    truncated,
   };
 }
 
